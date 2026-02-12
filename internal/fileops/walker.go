@@ -7,7 +7,7 @@ import (
 
 	gitignore "github.com/sabhiram/go-gitignore"
 
-	"github.com/Obedience-Corp/go-token-counter/internal/errors"
+	"github.com/lancekrogers/go-token-counter/internal/errors"
 )
 
 // WalkResult contains information about walked files.

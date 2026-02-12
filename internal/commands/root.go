@@ -9,10 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/Obedience-Corp/go-token-counter/internal/errors"
-	"github.com/Obedience-Corp/go-token-counter/internal/fileops"
-	"github.com/Obedience-Corp/go-token-counter/internal/tokens"
-	"github.com/Obedience-Corp/go-token-counter/internal/ui"
+	"github.com/lancekrogers/go-token-counter/internal/errors"
+	"github.com/lancekrogers/go-token-counter/internal/fileops"
+	"github.com/lancekrogers/go-token-counter/internal/tokens"
+	"github.com/lancekrogers/go-token-counter/internal/ui"
 )
 
 var (

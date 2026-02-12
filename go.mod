@@ -1,4 +1,4 @@
-module github.com/Obedience-Corp/go-token-counter
+module github.com/lancekrogers/go-token-counter
 
 go 1.25.6
 

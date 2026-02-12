@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/Obedience-Corp/go-token-counter/internal/errors"
+	"github.com/lancekrogers/go-token-counter/internal/errors"
 )
 
 // CountResult represents the result of token counting.
