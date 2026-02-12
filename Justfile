@@ -1,7 +1,7 @@
 set dotenv-load := false
 
-mod build '.justfiles/build.just'
-mod test '.justfiles/test.just'
+mod cross '.justfiles/build.just'
+mod testing '.justfiles/test.just'
 
 binary := "tcount"
 bin_dir := "bin"

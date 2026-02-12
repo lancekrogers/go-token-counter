@@ -1,3 +1,5 @@
+set working-directory := '..'
+
 binary := "tcount"
 bin_dir := "bin"
 

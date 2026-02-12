@@ -1,3 +1,5 @@
+set working-directory := '..'
+
 # Show available test recipes
 @default:
     just --list --justfile {{source_file()}}
