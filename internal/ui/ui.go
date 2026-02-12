@@ -21,12 +21,12 @@ func New(noColor, verbose bool) *UI {
 
 // Info prints an info message.
 func (u *UI) Info(format string, args ...any) {
-	fmt.Fprintf(os.Stdout, format+"\n", args...)
+	_, _ = fmt.Fprintf(os.Stdout, format+"\n", args...)
 }
 
 // Success prints a success message.
 func (u *UI) Success(format string, args ...any) {
-	fmt.Fprintf(os.Stdout, format+"\n", args...)
+	_, _ = fmt.Fprintf(os.Stdout, format+"\n", args...)
 }
 
 // Warning prints a warning message to stderr.
