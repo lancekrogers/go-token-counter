@@ -173,14 +173,65 @@ func (c *Counter) getApproximations(text string) []MethodResult {
 
 // initializeTokenizers sets up available tokenizers.
 func (c *Counter) initializeTokenizers() {
+	// OpenAI Models - GPT-5 series (o200k_base)
+	if tokenizer, err := NewTiktokenTokenizer("gpt-5"); err == nil {
+		c.tokenizers["gpt-5"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("gpt-5-mini"); err == nil {
+		c.tokenizers["gpt-5-mini"] = tokenizer
+	}
+
+	// OpenAI Models - GPT-4.1 series (o200k_base)
+	if tokenizer, err := NewTiktokenTokenizer("gpt-4.1"); err == nil {
+		c.tokenizers["gpt-4.1"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("gpt-4.1-mini"); err == nil {
+		c.tokenizers["gpt-4.1-mini"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("gpt-4.1-nano"); err == nil {
+		c.tokenizers["gpt-4.1-nano"] = tokenizer
+	}
+
+	// OpenAI Models - GPT-4o series (o200k_base)
+	if tokenizer, err := NewTiktokenTokenizer("gpt-4o"); err == nil {
+		c.tokenizers["gpt-4o"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("gpt-4o-mini"); err == nil {
+		c.tokenizers["gpt-4o-mini"] = tokenizer
+	}
+
+	// OpenAI Models - o-series (o200k_base)
+	if tokenizer, err := NewTiktokenTokenizer("o3"); err == nil {
+		c.tokenizers["o3"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("o3-mini"); err == nil {
+		c.tokenizers["o3-mini"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("o4-mini"); err == nil {
+		c.tokenizers["o4-mini"] = tokenizer
+	}
+
+	// OpenAI Models - Legacy (cl100k_base)
 	if tokenizer, err := NewTiktokenTokenizer("gpt-4"); err == nil {
 		c.tokenizers["gpt-4"] = tokenizer
 	}
-
+	if tokenizer, err := NewTiktokenTokenizer("gpt-4-turbo"); err == nil {
+		c.tokenizers["gpt-4-turbo"] = tokenizer
+	}
 	if tokenizer, err := NewTiktokenTokenizer("gpt-3.5-turbo"); err == nil {
 		c.tokenizers["gpt-3.5-turbo"] = tokenizer
 	}
 
+	// Anthropic Models - Claude (approximation)
+	c.tokenizers["claude-4-opus"] = NewClaudeApproximator()
+	c.tokenizers["claude-4-sonnet"] = NewClaudeApproximator()
+	c.tokenizers["claude-4.5-sonnet"] = NewClaudeApproximator()
+	c.tokenizers["claude-3.7-sonnet"] = NewClaudeApproximator()
+	c.tokenizers["claude-3.5-sonnet"] = NewClaudeApproximator()
+	c.tokenizers["claude-3-opus"] = NewClaudeApproximator()
+	c.tokenizers["claude-3-sonnet"] = NewClaudeApproximator()
+	c.tokenizers["claude-3-haiku"] = NewClaudeApproximator()
+	// Keep legacy name for backward compatibility
 	c.tokenizers["claude-3"] = NewClaudeApproximator()
 }
 

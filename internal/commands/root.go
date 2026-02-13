@@ -48,16 +48,21 @@ func newRootCmd() *cobra.Command {
 Provides token counts using different LLM tokenizers and approximation methods,
 helping you understand token usage and estimate costs.
 
+Supports all modern OpenAI models (GPT-5, GPT-4.1, GPT-4o, o-series) and
+Anthropic Claude models (Claude 4, Claude 3 series).
+
 When counting a directory with --recursive, the command:
   - Respects .gitignore files
   - Skips binary files automatically
   - Returns aggregated totals for all text files`,
-		Example: `  tcount document.md              # Count tokens in a file
-  tcount --model gpt-4 doc.md     # Use specific model tokenizer
-  tcount --all --cost doc.md      # Show all methods with costs
-  tcount --json doc.md            # Output as JSON
-  tcount -r ./src                 # Count all files in directory
-  tcount -r --json ./project      # Directory with JSON output`,
+		Example: `  tcount document.md                   # Count tokens in a file
+  tcount --model gpt-4o doc.md         # Use GPT-4o tokenizer
+  tcount --model gpt-5 doc.md          # Use GPT-5 tokenizer
+  tcount --model claude-4-sonnet doc.md # Use Claude 4 Sonnet
+  tcount --all --cost doc.md           # Show all methods with costs
+  tcount --json doc.md                 # Output as JSON
+  tcount -r ./src                      # Count all files in directory
+  tcount -r --json ./project           # Directory with JSON output`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCount(cmd.Context(), args[0], opts)
@@ -69,7 +74,18 @@ When counting a directory with --recursive, the command:
 	cmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "disable color output")
 	cmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "enable verbose output")
 
-	cmd.Flags().StringVar(&opts.model, "model", "", "specific model to use (gpt-4, gpt-3.5-turbo, claude-3)")
+	cmd.Flags().StringVar(&opts.model, "model", "", `specific model to use
+
+OpenAI Models:
+  GPT-5 series:     gpt-5, gpt-5-mini
+  GPT-4.1 series:   gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
+  GPT-4o series:    gpt-4o, gpt-4o-mini
+  o-series:         o3, o3-mini, o4-mini
+  Legacy:           gpt-4, gpt-4-turbo, gpt-3.5-turbo
+
+Anthropic Models:
+  Claude 4 series:  claude-4-opus, claude-4-sonnet, claude-4.5-sonnet
+  Claude 3 series:  claude-3.7-sonnet, claude-3.5-sonnet, claude-3-opus, claude-3-sonnet, claude-3-haiku, claude-3`)
 	cmd.Flags().BoolVar(&opts.all, "all", false, "show all counting methods")
 	cmd.Flags().BoolVar(&opts.jsonOutput, "json", false, "output in JSON format")
 	cmd.Flags().BoolVar(&opts.showCost, "cost", false, "include cost estimates")
@@ -81,8 +97,39 @@ When counting a directory with --recursive, the command:
 	return cmd
 }
 
+// validModels returns the list of valid model names.
+func validModels() []string {
+	return []string{
+		"gpt-5", "gpt-5-mini",
+		"gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+		"gpt-4o", "gpt-4o-mini",
+		"o3", "o3-mini", "o4-mini",
+		"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
+		"claude-4-opus", "claude-4-sonnet", "claude-4.5-sonnet",
+		"claude-3.7-sonnet", "claude-3.5-sonnet",
+		"claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3",
+	}
+}
+
+// isValidModel checks if a model name is valid.
+func isValidModel(model string) bool {
+	if model == "" {
+		return true
+	}
+	for _, valid := range validModels() {
+		if model == valid {
+			return true
+		}
+	}
+	return false
+}
+
 func runCount(ctx context.Context, path string, opts *countOptions) error {
 	display := ui.New(noColor, verbose)
+
+	if !isValidModel(opts.model) {
+		display.Warning("Unknown model '%s', using approximation methods", opts.model)
+	}
 
 	info, err := os.Stat(path)
 	if err != nil {

@@ -57,18 +57,40 @@ func (t *TiktokenTokenizer) IsExact() bool {
 }
 
 // getEncodingForModel maps model names to encoding types.
+// Order matters: check o200k_base models FIRST, then fall back to cl100k_base.
 func getEncodingForModel(model string) string {
 	model = strings.ToLower(model)
 
-	if strings.Contains(model, "gpt-4") || strings.Contains(model, "gpt-3.5") {
+	// o200k_base models (check these FIRST to avoid prefix collisions)
+	// GPT-5 series
+	if strings.HasPrefix(model, "gpt-5") {
+		return "o200k_base"
+	}
+	// GPT-4.1 series
+	if strings.HasPrefix(model, "gpt-4.1") {
+		return "o200k_base"
+	}
+	// GPT-4o series (must check before "gpt-4")
+	if strings.HasPrefix(model, "gpt-4o") {
+		return "o200k_base"
+	}
+	// o-series models (o3, o3-mini, o4-mini)
+	if strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
+		return "o200k_base"
+	}
+
+	// cl100k_base models (legacy)
+	if strings.HasPrefix(model, "gpt-4") || strings.HasPrefix(model, "gpt-3.5") {
 		return "cl100k_base"
 	}
 
+	// p50k_base models (older models)
 	if strings.Contains(model, "davinci") || strings.Contains(model, "curie") {
 		return "p50k_base"
 	}
 
-	return "cl100k_base"
+	// Default to o200k_base for unknown modern models
+	return "o200k_base"
 }
 
 // ClaudeApproximator provides approximation for Claude models.
@@ -93,7 +115,7 @@ func (c *ClaudeApproximator) Name() string {
 
 // DisplayName returns the human-readable tokenizer name.
 func (c *ClaudeApproximator) DisplayName() string {
-	return "Claude-3 (approx)"
+	return "Claude (approx)"
 }
 
 // IsExact returns false for approximations.
