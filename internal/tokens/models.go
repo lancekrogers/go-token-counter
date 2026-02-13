@@ -5,6 +5,14 @@ package tokens
 // encoding, context windows, and pricing.
 
 // Provider represents an LLM provider.
+// Supported providers:
+//   - openai: OpenAI models (GPT-4, GPT-5, etc.)
+//   - anthropic: Anthropic models (Claude series)
+//   - meta: Meta models (Llama series)
+//   - deepseek: DeepSeek models (DeepSeek v2/v3)
+//   - alibaba: Alibaba Cloud models (Qwen series)
+//   - microsoft: Microsoft models (Phi series)
+//   - google: Google models (Gemma series)
 type Provider string
 
 const (
@@ -58,6 +66,24 @@ func ListModelsByProvider(provider Provider) []ModelMetadata {
 		}
 	}
 	return models
+}
+
+// GetProviderForModel returns the provider for a given model name.
+// Returns empty string if model is not registered.
+func GetProviderForModel(modelName string) Provider {
+	if meta := GetModelMetadata(modelName); meta != nil {
+		return meta.Provider
+	}
+	return ""
+}
+
+// IsOpenSourceModel returns true if the model is from an open-source provider
+// (not OpenAI or Anthropic).
+func IsOpenSourceModel(modelName string) bool {
+	provider := GetProviderForModel(modelName)
+	return provider != "" &&
+		provider != ProviderOpenAI &&
+		provider != ProviderAnthropic
 }
 
 func init() {
@@ -250,5 +276,134 @@ func init() {
 		ContextWindow:    200000,
 		InputPricePer1M:  3.00,
 		OutputPricePer1M: 15.00,
+	}
+
+	// Meta Models - Llama 3 series (tiktoken cl100k_base approximation)
+	// Note: Llama uses its own tokenizer, but cl100k_base provides reasonable approximation
+	modelRegistry["llama-3.1-8b"] = ModelMetadata{
+		Name:             "llama-3.1-8b",
+		Provider:         ProviderMeta,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["llama-3.1-70b"] = ModelMetadata{
+		Name:             "llama-3.1-70b",
+		Provider:         ProviderMeta,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["llama-3.1-405b"] = ModelMetadata{
+		Name:             "llama-3.1-405b",
+		Provider:         ProviderMeta,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["llama-4-scout"] = ModelMetadata{
+		Name:             "llama-4-scout",
+		Provider:         ProviderMeta,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["llama-4-maverick"] = ModelMetadata{
+		Name:             "llama-4-maverick",
+		Provider:         ProviderMeta,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+
+	// DeepSeek Models (tiktoken cl100k_base approximation)
+	modelRegistry["deepseek-v2"] = ModelMetadata{
+		Name:             "deepseek-v2",
+		Provider:         ProviderDeepSeek,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["deepseek-v3"] = ModelMetadata{
+		Name:             "deepseek-v3",
+		Provider:         ProviderDeepSeek,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["deepseek-coder-v2"] = ModelMetadata{
+		Name:             "deepseek-coder-v2",
+		Provider:         ProviderDeepSeek,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+
+	// Alibaba Models - Qwen 2/3 series (tiktoken cl100k_base compatible)
+	modelRegistry["qwen-2.5-7b"] = ModelMetadata{
+		Name:             "qwen-2.5-7b",
+		Provider:         ProviderAlibaba,
+		Encoding:         "cl100k_base",
+		ContextWindow:    32768,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["qwen-2.5-14b"] = ModelMetadata{
+		Name:             "qwen-2.5-14b",
+		Provider:         ProviderAlibaba,
+		Encoding:         "cl100k_base",
+		ContextWindow:    32768,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["qwen-2.5-72b"] = ModelMetadata{
+		Name:             "qwen-2.5-72b",
+		Provider:         ProviderAlibaba,
+		Encoding:         "cl100k_base",
+		ContextWindow:    32768,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["qwen-3-72b"] = ModelMetadata{
+		Name:             "qwen-3-72b",
+		Provider:         ProviderAlibaba,
+		Encoding:         "cl100k_base",
+		ContextWindow:    32768,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+
+	// Microsoft Models - Phi-3 series (tiktoken cl100k_base compatible)
+	modelRegistry["phi-3-mini"] = ModelMetadata{
+		Name:             "phi-3-mini",
+		Provider:         ProviderMicrosoft,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["phi-3-small"] = ModelMetadata{
+		Name:             "phi-3-small",
+		Provider:         ProviderMicrosoft,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
+	}
+	modelRegistry["phi-3-medium"] = ModelMetadata{
+		Name:             "phi-3-medium",
+		Provider:         ProviderMicrosoft,
+		Encoding:         "cl100k_base",
+		ContextWindow:    128000,
+		InputPricePer1M:  0.0,
+		OutputPricePer1M: 0.0,
 	}
 }

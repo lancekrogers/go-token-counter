@@ -109,6 +109,32 @@ func TestGetEncodingForModel(t *testing.T) {
 			reason:       "Unknown models default to o200k_base",
 		},
 
+		// Open source models (cl100k_base approximation)
+		{
+			name:         "llama-3.1-8b",
+			model:        "llama-3.1-8b",
+			wantEncoding: "cl100k_base",
+			reason:       "Llama uses cl100k_base approximation",
+		},
+		{
+			name:         "deepseek-v3",
+			model:        "deepseek-v3",
+			wantEncoding: "cl100k_base",
+			reason:       "DeepSeek uses cl100k_base approximation",
+		},
+		{
+			name:         "qwen-2.5-7b",
+			model:        "qwen-2.5-7b",
+			wantEncoding: "cl100k_base",
+			reason:       "Qwen uses cl100k_base approximation",
+		},
+		{
+			name:         "phi-3-mini",
+			model:        "phi-3-mini",
+			wantEncoding: "cl100k_base",
+			reason:       "Phi uses cl100k_base approximation",
+		},
+
 		// Case insensitivity
 		{
 			name:         "GPT-4O uppercase",

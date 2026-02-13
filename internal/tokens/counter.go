@@ -233,6 +233,59 @@ func (c *Counter) initializeTokenizers() {
 	c.tokenizers["claude-3-haiku"] = NewClaudeApproximator()
 	// Keep legacy name for backward compatibility
 	c.tokenizers["claude-3"] = NewClaudeApproximator()
+
+	// Meta Models - Llama (tiktoken approximation)
+	if tokenizer, err := NewTiktokenTokenizer("llama-3.1-8b"); err == nil {
+		c.tokenizers["llama-3.1-8b"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("llama-3.1-70b"); err == nil {
+		c.tokenizers["llama-3.1-70b"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("llama-3.1-405b"); err == nil {
+		c.tokenizers["llama-3.1-405b"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("llama-4-scout"); err == nil {
+		c.tokenizers["llama-4-scout"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("llama-4-maverick"); err == nil {
+		c.tokenizers["llama-4-maverick"] = tokenizer
+	}
+
+	// DeepSeek Models
+	if tokenizer, err := NewTiktokenTokenizer("deepseek-v2"); err == nil {
+		c.tokenizers["deepseek-v2"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("deepseek-v3"); err == nil {
+		c.tokenizers["deepseek-v3"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("deepseek-coder-v2"); err == nil {
+		c.tokenizers["deepseek-coder-v2"] = tokenizer
+	}
+
+	// Alibaba Models - Qwen
+	if tokenizer, err := NewTiktokenTokenizer("qwen-2.5-7b"); err == nil {
+		c.tokenizers["qwen-2.5-7b"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("qwen-2.5-14b"); err == nil {
+		c.tokenizers["qwen-2.5-14b"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("qwen-2.5-72b"); err == nil {
+		c.tokenizers["qwen-2.5-72b"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("qwen-3-72b"); err == nil {
+		c.tokenizers["qwen-3-72b"] = tokenizer
+	}
+
+	// Microsoft Models - Phi
+	if tokenizer, err := NewTiktokenTokenizer("phi-3-mini"); err == nil {
+		c.tokenizers["phi-3-mini"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("phi-3-small"); err == nil {
+		c.tokenizers["phi-3-small"] = tokenizer
+	}
+	if tokenizer, err := NewTiktokenTokenizer("phi-3-medium"); err == nil {
+		c.tokenizers["phi-3-medium"] = tokenizer
+	}
 }
 
 // countWords counts words in text.

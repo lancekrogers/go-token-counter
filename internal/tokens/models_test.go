@@ -139,6 +139,112 @@ func TestOpenAIEncodingCorrectness(t *testing.T) {
 	}
 }
 
+func TestProviderConstants(t *testing.T) {
+	providers := []Provider{
+		ProviderOpenAI,
+		ProviderAnthropic,
+		ProviderMeta,
+		ProviderDeepSeek,
+		ProviderAlibaba,
+		ProviderMicrosoft,
+		ProviderGoogle,
+	}
+
+	for _, p := range providers {
+		if string(p) == "" {
+			t.Errorf("Provider %v has empty string value", p)
+		}
+	}
+
+	seen := make(map[string]bool)
+	for _, p := range providers {
+		s := string(p)
+		if seen[s] {
+			t.Errorf("Duplicate provider string: %q", s)
+		}
+		seen[s] = true
+	}
+}
+
+func TestGetProviderForModel(t *testing.T) {
+	tests := []struct {
+		model        string
+		wantProvider Provider
+	}{
+		{"gpt-4o", ProviderOpenAI},
+		{"claude-4-sonnet", ProviderAnthropic},
+		{"unknown-model", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			got := GetProviderForModel(tt.model)
+			if got != tt.wantProvider {
+				t.Errorf("GetProviderForModel(%q) = %q, want %q",
+					tt.model, got, tt.wantProvider)
+			}
+		})
+	}
+}
+
+func TestIsOpenSourceModel(t *testing.T) {
+	tests := []struct {
+		model  string
+		wantOS bool
+	}{
+		{"gpt-4o", false},
+		{"claude-4-sonnet", false},
+		{"unknown-model", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			got := IsOpenSourceModel(tt.model)
+			if got != tt.wantOS {
+				t.Errorf("IsOpenSourceModel(%q) = %v, want %v",
+					tt.model, got, tt.wantOS)
+			}
+		})
+	}
+}
+
+func TestOSSModelsRegistered(t *testing.T) {
+	ossModels := map[string]Provider{
+		"llama-3.1-8b":      ProviderMeta,
+		"llama-3.1-70b":     ProviderMeta,
+		"llama-3.1-405b":    ProviderMeta,
+		"llama-4-scout":     ProviderMeta,
+		"llama-4-maverick":  ProviderMeta,
+		"deepseek-v2":       ProviderDeepSeek,
+		"deepseek-v3":       ProviderDeepSeek,
+		"deepseek-coder-v2": ProviderDeepSeek,
+		"qwen-2.5-7b":       ProviderAlibaba,
+		"qwen-2.5-14b":      ProviderAlibaba,
+		"qwen-2.5-72b":      ProviderAlibaba,
+		"qwen-3-72b":        ProviderAlibaba,
+		"phi-3-mini":        ProviderMicrosoft,
+		"phi-3-small":       ProviderMicrosoft,
+		"phi-3-medium":      ProviderMicrosoft,
+	}
+
+	for modelName, wantProvider := range ossModels {
+		t.Run(modelName, func(t *testing.T) {
+			meta := GetModelMetadata(modelName)
+			if meta == nil {
+				t.Fatalf("Model %q not registered", modelName)
+			}
+			if meta.Provider != wantProvider {
+				t.Errorf("Model %q provider = %v, want %v",
+					modelName, meta.Provider, wantProvider)
+			}
+			if meta.Encoding != "cl100k_base" {
+				t.Errorf("Model %q encoding = %v, want cl100k_base",
+					modelName, meta.Encoding)
+			}
+		})
+	}
+}
+
 func TestRegistryMatchesTokenizer(t *testing.T) {
 	models := []string{"gpt-4o", "gpt-5", "gpt-4", "gpt-3.5-turbo"}
 

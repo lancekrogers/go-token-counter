@@ -48,6 +48,18 @@ func (t *TiktokenTokenizer) Name() string {
 
 // DisplayName returns the human-readable tokenizer name.
 func (t *TiktokenTokenizer) DisplayName() string {
+	if meta := GetModelMetadata(t.model); meta != nil {
+		switch meta.Provider {
+		case ProviderMeta:
+			return fmt.Sprintf("Llama (%s)", t.model)
+		case ProviderDeepSeek:
+			return fmt.Sprintf("DeepSeek (%s)", t.model)
+		case ProviderAlibaba:
+			return fmt.Sprintf("Qwen (%s)", t.model)
+		case ProviderMicrosoft:
+			return fmt.Sprintf("Phi (%s)", t.model)
+		}
+	}
 	return fmt.Sprintf("GPT (%s)", t.model)
 }
 
@@ -81,6 +93,15 @@ func getEncodingForModel(model string) string {
 
 	// cl100k_base models (legacy)
 	if strings.HasPrefix(model, "gpt-4") || strings.HasPrefix(model, "gpt-3.5") {
+		return "cl100k_base"
+	}
+
+	// Open source models (Llama, DeepSeek, Qwen, Phi)
+	// These use cl100k_base as a reasonable approximation
+	if strings.HasPrefix(model, "llama-") ||
+		strings.HasPrefix(model, "deepseek-") ||
+		strings.HasPrefix(model, "qwen-") ||
+		strings.HasPrefix(model, "phi-") {
 		return "cl100k_base"
 	}
 
