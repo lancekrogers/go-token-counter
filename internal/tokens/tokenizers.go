@@ -1,9 +1,12 @@
 package tokens
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/pkoukk/tiktoken-go"
 
 	"github.com/lancekrogers/go-token-counter/internal/errors"
@@ -142,4 +145,71 @@ func (c *ClaudeApproximator) DisplayName() string {
 // IsExact returns false for approximations.
 func (c *ClaudeApproximator) IsExact() bool {
 	return false
+}
+
+// ClaudeAPITokenizer uses Anthropic's Messages.CountTokens API for exact token counting.
+type ClaudeAPITokenizer struct {
+	client *anthropic.Client
+	model  string
+}
+
+// NewClaudeAPITokenizer creates a tokenizer that uses Anthropic's token counting API.
+// Returns an error if apiKey or model is empty.
+func NewClaudeAPITokenizer(apiKey, model string) (*ClaudeAPITokenizer, error) {
+	if apiKey == "" {
+		return nil, fmt.Errorf("API key is required for ClaudeAPITokenizer")
+	}
+	if model == "" {
+		return nil, fmt.Errorf("model is required for ClaudeAPITokenizer")
+	}
+
+	client := anthropic.NewClient(
+		option.WithAPIKey(apiKey),
+	)
+
+	return &ClaudeAPITokenizer{
+		client: &client,
+		model:  model,
+	}, nil
+}
+
+// CountTokensWithContext returns the exact token count by calling Anthropic's API.
+func (t *ClaudeAPITokenizer) CountTokensWithContext(ctx context.Context, text string) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+
+	response, err := t.client.Messages.CountTokens(ctx, anthropic.MessageCountTokensParams{
+		Model: anthropic.Model(t.model),
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(text)),
+		},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("anthropic API request failed: %w", err)
+	}
+
+	return int(response.InputTokens), nil
+}
+
+// CountTokens implements the Tokenizer interface using a background context.
+func (t *ClaudeAPITokenizer) CountTokens(text string) (int, error) {
+	return t.CountTokensWithContext(context.Background(), text)
+}
+
+// Name returns the machine-readable tokenizer identifier.
+func (t *ClaudeAPITokenizer) Name() string {
+	modelName := strings.ReplaceAll(t.model, "-", "_")
+	modelName = strings.ReplaceAll(modelName, ".", "_")
+	return fmt.Sprintf("claude_api_%s", modelName)
+}
+
+// DisplayName returns the human-readable tokenizer name.
+func (t *ClaudeAPITokenizer) DisplayName() string {
+	return fmt.Sprintf("Claude API (%s)", t.model)
+}
+
+// IsExact returns true because this uses Anthropic's official API.
+func (t *ClaudeAPITokenizer) IsExact() bool {
+	return true
 }
