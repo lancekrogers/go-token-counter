@@ -7,27 +7,52 @@ import (
 // ModelPricing represents pricing for a model.
 type ModelPricing struct {
 	Model       string
-	InputPer1K  float64
-	OutputPer1K float64
+	InputPer1M  float64
+	OutputPer1M float64
 }
 
-// Common model pricing (as of 2024).
+// Model pricing data last updated: 2026-02-13
+// Sources:
+// - OpenAI: https://openai.com/api/pricing/
+// - Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
+// Pricing is stored as cost per 1M tokens (industry standard).
 var modelPricing = []ModelPricing{
-	// OpenAI GPT-4
-	{Model: "gpt-4", InputPer1K: 0.01, OutputPer1K: 0.03},
-	{Model: "gpt-4-turbo", InputPer1K: 0.01, OutputPer1K: 0.03},
-	{Model: "gpt-4o", InputPer1K: 0.005, OutputPer1K: 0.015},
+	// OpenAI GPT-5 series (2026)
+	{Model: "gpt-5", InputPer1M: 1.25, OutputPer1M: 10.00},
+	{Model: "gpt-5-mini", InputPer1M: 0.25, OutputPer1M: 2.00},
 
-	// OpenAI GPT-3.5
-	{Model: "gpt-3.5-turbo", InputPer1K: 0.0005, OutputPer1K: 0.0015},
-	{Model: "gpt-3.5-turbo-16k", InputPer1K: 0.003, OutputPer1K: 0.004},
+	// OpenAI GPT-4.1 series (2026)
+	{Model: "gpt-4.1", InputPer1M: 2.00, OutputPer1M: 8.00},
+	{Model: "gpt-4.1-mini", InputPer1M: 0.40, OutputPer1M: 1.60},
+	{Model: "gpt-4.1-nano", InputPer1M: 0.10, OutputPer1M: 0.40},
 
-	// Anthropic Claude
-	{Model: "claude-3-opus", InputPer1K: 0.015, OutputPer1K: 0.075},
-	{Model: "claude-3-sonnet", InputPer1K: 0.003, OutputPer1K: 0.015},
-	{Model: "claude-3-haiku", InputPer1K: 0.00025, OutputPer1K: 0.00125},
-	{Model: "claude-2.1", InputPer1K: 0.008, OutputPer1K: 0.024},
-	{Model: "claude-2", InputPer1K: 0.008, OutputPer1K: 0.024},
+	// OpenAI GPT-4o series
+	{Model: "gpt-4o", InputPer1M: 2.50, OutputPer1M: 10.00},
+	{Model: "gpt-4o-mini", InputPer1M: 0.15, OutputPer1M: 0.60},
+
+	// OpenAI o-series reasoning models (2026)
+	{Model: "o3", InputPer1M: 2.00, OutputPer1M: 8.00},
+	{Model: "o3-mini", InputPer1M: 1.10, OutputPer1M: 4.40},
+	{Model: "o4-mini", InputPer1M: 1.10, OutputPer1M: 4.40},
+
+	// OpenAI Legacy
+	{Model: "gpt-4", InputPer1M: 10.00, OutputPer1M: 30.00},
+	{Model: "gpt-4-turbo", InputPer1M: 10.00, OutputPer1M: 30.00},
+	{Model: "gpt-3.5-turbo", InputPer1M: 0.50, OutputPer1M: 1.50},
+
+	// Anthropic Claude 4.5 series (2026)
+	{Model: "claude-4.5-sonnet", InputPer1M: 3.00, OutputPer1M: 15.00},
+
+	// Anthropic Claude 4 series (2026)
+	{Model: "claude-4-opus", InputPer1M: 15.00, OutputPer1M: 75.00},
+	{Model: "claude-4-sonnet", InputPer1M: 3.00, OutputPer1M: 15.00},
+
+	// Anthropic Claude 3.x series
+	{Model: "claude-3.7-sonnet", InputPer1M: 3.00, OutputPer1M: 15.00},
+	{Model: "claude-3.5-sonnet", InputPer1M: 3.00, OutputPer1M: 15.00},
+	{Model: "claude-3-opus", InputPer1M: 15.00, OutputPer1M: 75.00},
+	{Model: "claude-3-sonnet", InputPer1M: 3.00, OutputPer1M: 15.00},
+	{Model: "claude-3-haiku", InputPer1M: 0.25, OutputPer1M: 1.25},
 }
 
 // CalculateCosts calculates cost estimates based on token counts.
@@ -44,8 +69,8 @@ func CalculateCosts(methods []MethodResult) []CostEstimate {
 			cost := CostEstimate{
 				Model:     pricing.Model,
 				Tokens:    tokenCount,
-				RatePer1K: pricing.InputPer1K,
-				Cost:      float64(tokenCount) * pricing.InputPer1K / 1000.0,
+				RatePer1M: pricing.InputPer1M,
+				Cost:      float64(tokenCount) * pricing.InputPer1M / 1_000_000.0,
 			}
 			costs = append(costs, cost)
 		}
@@ -78,10 +103,10 @@ func getTokenCount(methods []MethodResult) int {
 // isMainModel checks if a model should be shown in default cost output.
 func isMainModel(model string) bool {
 	mainModels := []string{
-		"gpt-4",
-		"gpt-3.5-turbo",
-		"claude-3-opus",
-		"claude-3-sonnet",
+		"gpt-5",
+		"gpt-4o",
+		"claude-4-sonnet",
+		"claude-4.5-sonnet",
 	}
 
 	for _, main := range mainModels {

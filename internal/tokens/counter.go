@@ -34,7 +34,7 @@ type CostEstimate struct {
 	Model     string  `json:"model"`
 	Tokens    int     `json:"tokens"`
 	Cost      float64 `json:"cost"`
-	RatePer1K float64 `json:"rate_per_1k"`
+	RatePer1M float64 `json:"rate_per_1m"`
 }
 
 // CounterOptions configures the counter.

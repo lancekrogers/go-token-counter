@@ -295,8 +295,8 @@ func outputTable(display *ui.UI, result *tokens.CountResult) error {
 		display.Info("Cost Estimates (Input):")
 
 		for _, cost := range result.Costs {
-			display.Info("  %-16s $%.3f ($%.4f/1K tokens)",
-				cost.Model+":", cost.Cost, cost.RatePer1K)
+			display.Info("  %-16s $%.4f ($%.2f/1M tokens)",
+				cost.Model+":", cost.Cost, cost.RatePer1M)
 		}
 	}
 
