@@ -219,6 +219,93 @@ func TestInitializeTokenizers(t *testing.T) {
 	}
 }
 
+func TestCounter_CountSpecificModel(t *testing.T) {
+	text := "The quick brown fox jumps over the lazy dog."
+
+	counter := NewCounter(CounterOptions{})
+
+	result, err := counter.Count(text, "gpt-5", false)
+	if err != nil {
+		t.Fatalf("Count with specific model failed: %v", err)
+	}
+
+	if len(result.Methods) != 1 {
+		t.Errorf("Expected 1 method for specific model, got %d", len(result.Methods))
+	}
+
+	if result.Methods[0].IsExact != true {
+		t.Error("GPT-5 tokenizer should be exact")
+	}
+
+	if result.Methods[0].ContextWindow == 0 {
+		t.Error("Expected context window to be populated for gpt-5")
+	}
+}
+
+func TestCounter_CountSpecificModel_Unknown(t *testing.T) {
+	text := "The quick brown fox."
+
+	counter := NewCounter(CounterOptions{})
+
+	result, err := counter.Count(text, "unknown-model-xyz", false)
+	if err != nil {
+		t.Fatalf("Count with unknown model failed: %v", err)
+	}
+
+	// Should fall back to approximations
+	if len(result.Methods) < 3 {
+		t.Errorf("Expected at least 3 approximation methods for unknown model, got %d", len(result.Methods))
+	}
+}
+
+func TestCounter_ProviderFilter(t *testing.T) {
+	text := "The quick brown fox jumps over the lazy dog."
+
+	counter := NewCounter(CounterOptions{Provider: "openai"})
+
+	result, err := counter.Count(text, "", true)
+	if err != nil {
+		t.Fatalf("Count with provider filter failed: %v", err)
+	}
+
+	for _, method := range result.Methods {
+		name := strings.ToLower(method.Name)
+		// Approximation methods don't have providers, skip them
+		if strings.Contains(name, "character_based") ||
+			strings.Contains(name, "word_based") ||
+			strings.Contains(name, "whitespace") {
+			continue
+		}
+		// Non-OpenAI models should not be in the results
+		if strings.Contains(name, "claude") || strings.Contains(name, "llama") {
+			t.Errorf("Provider filter 'openai' should exclude %s", method.Name)
+		}
+	}
+}
+
+func TestCounter_ContextWindowPopulated(t *testing.T) {
+	text := "The quick brown fox jumps over the lazy dog."
+
+	counter := NewCounter(CounterOptions{})
+
+	result, err := counter.Count(text, "", true)
+	if err != nil {
+		t.Fatalf("Count failed: %v", err)
+	}
+
+	hasContextWindow := false
+	for _, method := range result.Methods {
+		if method.ContextWindow > 0 {
+			hasContextWindow = true
+			break
+		}
+	}
+
+	if !hasContextWindow {
+		t.Error("Expected at least one method to have a context window populated")
+	}
+}
+
 func BenchmarkCountWords(b *testing.B) {
 	text := strings.Repeat("The quick brown fox jumps over the lazy dog. ", 100)
 
