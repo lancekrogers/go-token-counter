@@ -41,12 +41,14 @@ type CostEstimate struct {
 type CounterOptions struct {
 	CharsPerToken float64
 	WordsPerToken float64
+	VocabFile     string
 }
 
 // Counter handles token counting.
 type Counter struct {
 	charsPerToken float64
 	wordsPerToken float64
+	vocabFile     string
 	tokenizers    map[string]Tokenizer
 }
 
@@ -70,6 +72,7 @@ func NewCounter(opts CounterOptions) *Counter {
 	return &Counter{
 		charsPerToken: opts.CharsPerToken,
 		wordsPerToken: opts.WordsPerToken,
+		vocabFile:     opts.VocabFile,
 		tokenizers:    make(map[string]Tokenizer),
 	}
 }
@@ -285,6 +288,20 @@ func (c *Counter) initializeTokenizers() {
 	}
 	if tokenizer, err := NewTiktokenTokenizer("phi-3-medium"); err == nil {
 		c.tokenizers["phi-3-medium"] = tokenizer
+	}
+
+	// SentencePiece tokenizer (when vocab file is provided)
+	if c.vocabFile != "" {
+		if tokenizer, err := NewSentencePieceTokenizer(c.vocabFile); err == nil {
+			// Register for all models that use SentencePiece
+			spModels := []string{
+				"llama-3.1-8b", "llama-3.1-70b", "llama-3.1-405b",
+				"llama-4-scout", "llama-4-maverick",
+			}
+			for _, model := range spModels {
+				c.tokenizers[model] = tokenizer
+			}
+		}
 	}
 }
 

@@ -22,6 +22,7 @@ var (
 
 type countOptions struct {
 	model         string
+	vocabFile     string
 	all           bool
 	jsonOutput    bool
 	showCost      bool
@@ -33,6 +34,7 @@ type countOptions struct {
 // Execute runs the root command.
 func Execute() {
 	if err := newRootCmd().Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -55,14 +57,15 @@ When counting a directory with --recursive, the command:
   - Respects .gitignore files
   - Skips binary files automatically
   - Returns aggregated totals for all text files`,
-		Example: `  tcount document.md                   # Count tokens in a file
-  tcount --model gpt-4o doc.md         # Use GPT-4o tokenizer
-  tcount --model gpt-5 doc.md          # Use GPT-5 tokenizer
-  tcount --model claude-4-sonnet doc.md # Use Claude 4 Sonnet
-  tcount --all --cost doc.md           # Show all methods with costs
-  tcount --json doc.md                 # Output as JSON
-  tcount -r ./src                      # Count all files in directory
-  tcount -r --json ./project           # Directory with JSON output`,
+		Example: `  tcount document.md                                       # Count tokens in a file
+  tcount --model gpt-4o doc.md                             # Use GPT-4o tokenizer
+  tcount --model gpt-5 doc.md                              # Use GPT-5 tokenizer
+  tcount --model claude-4-sonnet doc.md                    # Use Claude 4 Sonnet
+  tcount --model llama-3.1-8b --vocab-file tokenizer.model doc.md  # SentencePiece
+  tcount --all --cost doc.md                               # Show all methods with costs
+  tcount --json doc.md                                     # Output as JSON
+  tcount -r ./src                                          # Count all files in directory
+  tcount -r --json ./project                               # Directory with JSON output`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCount(cmd.Context(), args[0], opts)
@@ -92,6 +95,9 @@ Open Source Models (tiktoken approximation):
   DeepSeek:         deepseek-v2, deepseek-v3, deepseek-coder-v2
   Qwen:             qwen-2.5-7b, qwen-2.5-14b, qwen-2.5-72b, qwen-3-72b
   Phi:              phi-3-mini, phi-3-small, phi-3-medium`)
+	cmd.Flags().StringVar(&opts.vocabFile, "vocab-file", "", `path to SentencePiece .model file for exact tokenization
+Required for models that use SentencePiece (e.g., llama-3.1-8b)
+Download vocab files from HuggingFace (see error messages for URLs)`)
 	cmd.Flags().BoolVar(&opts.all, "all", false, "show all counting methods")
 	cmd.Flags().BoolVar(&opts.jsonOutput, "json", false, "output in JSON format")
 	cmd.Flags().BoolVar(&opts.showCost, "cost", false, "include cost estimates")
@@ -132,6 +138,23 @@ func isValidModel(model string) bool {
 		}
 	}
 	return false
+}
+
+// sentencePieceVocabURLs maps model prefixes to their HuggingFace vocab download URLs.
+var sentencePieceVocabURLs = map[string]string{
+	"llama-3.1": "https://huggingface.co/meta-llama/Llama-3.1-8B/blob/main/original/tokenizer.model",
+	"llama-4":   "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E/blob/main/tokenizer.model",
+}
+
+// requiresSentencePiece checks if a model can use SentencePiece tokenization
+// and returns the download URL for the vocab file.
+func requiresSentencePiece(model string) (bool, string) {
+	for prefix, url := range sentencePieceVocabURLs {
+		if strings.HasPrefix(model, prefix) {
+			return true, url
+		}
+	}
+	return false, ""
 }
 
 func runCount(ctx context.Context, path string, opts *countOptions) error {
@@ -183,9 +206,22 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 		fileCount = 1
 	}
 
+	// Check if model requires SentencePiece and validate vocab-file flag
+	if needsSP, downloadURL := requiresSentencePiece(opts.model); needsSP && opts.vocabFile == "" {
+		return fmt.Errorf(
+			"model %s requires a SentencePiece vocab file\n\n"+
+				"Download the tokenizer.model file from:\n"+
+				"  %s\n\n"+
+				"Then run:\n"+
+				"  tcount --model %s --vocab-file /path/to/tokenizer.model <input>",
+			opts.model, downloadURL, opts.model,
+		)
+	}
+
 	counter := tokens.NewCounter(tokens.CounterOptions{
 		CharsPerToken: opts.charsPerToken,
 		WordsPerToken: opts.wordsPerToken,
+		VocabFile:     opts.vocabFile,
 	})
 
 	result, err := counter.Count(string(content), opts.model, opts.all)

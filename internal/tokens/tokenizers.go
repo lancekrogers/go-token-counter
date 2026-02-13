@@ -3,10 +3,12 @@ package tokens
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	sentencepiece "github.com/eliben/go-sentencepiece"
 	"github.com/pkoukk/tiktoken-go"
 
 	"github.com/lancekrogers/go-token-counter/internal/errors"
@@ -211,5 +213,58 @@ func (t *ClaudeAPITokenizer) DisplayName() string {
 
 // IsExact returns true because this uses Anthropic's official API.
 func (t *ClaudeAPITokenizer) IsExact() bool {
+	return true
+}
+
+// SentencePieceTokenizer uses a .model vocab file for exact tokenization.
+// Supports models like Llama 2, Mistral, and Gemma.
+type SentencePieceTokenizer struct {
+	processor *sentencepiece.Processor
+	modelPath string
+}
+
+// NewSentencePieceTokenizer creates a tokenizer from a SentencePiece .model file.
+// Returns an error if the model file doesn't exist, is inaccessible, or cannot be loaded.
+func NewSentencePieceTokenizer(modelPath string) (*SentencePieceTokenizer, error) {
+	if modelPath == "" {
+		return nil, fmt.Errorf("model path is required for SentencePieceTokenizer")
+	}
+
+	if _, err := os.Stat(modelPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("vocab file not found: %s", modelPath)
+		}
+		return nil, fmt.Errorf("failed to access vocab file: %w", err)
+	}
+
+	processor, err := sentencepiece.NewProcessorFromPath(modelPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load SentencePiece model: %w", err)
+	}
+
+	return &SentencePieceTokenizer{
+		processor: processor,
+		modelPath: modelPath,
+	}, nil
+}
+
+// CountTokens returns the token count using the SentencePiece model.
+func (t *SentencePieceTokenizer) CountTokens(text string) (int, error) {
+	tokens := t.processor.Encode(text)
+	return len(tokens), nil
+}
+
+// Name returns the machine-readable tokenizer identifier.
+func (t *SentencePieceTokenizer) Name() string {
+	return "sentencepiece"
+}
+
+// DisplayName returns the human-readable tokenizer name.
+func (t *SentencePieceTokenizer) DisplayName() string {
+	return "SentencePiece"
+}
+
+// IsExact returns true because SentencePiece provides exact token counts.
+func (t *SentencePieceTokenizer) IsExact() bool {
 	return true
 }
