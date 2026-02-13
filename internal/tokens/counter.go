@@ -23,10 +23,11 @@ type CountResult struct {
 
 // MethodResult represents token count for a specific method.
 type MethodResult struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
-	Tokens      int    `json:"tokens"`
-	IsExact     bool   `json:"is_exact"`
+	Name          string `json:"name"`
+	DisplayName   string `json:"display_name"`
+	Tokens        int    `json:"tokens"`
+	IsExact       bool   `json:"is_exact"`
+	ContextWindow int    `json:"context_window,omitempty"`
 }
 
 // CostEstimate represents cost estimation for a model.
@@ -42,6 +43,7 @@ type CounterOptions struct {
 	CharsPerToken float64
 	WordsPerToken float64
 	VocabFile     string
+	Provider      string
 }
 
 // Counter handles token counting.
@@ -49,6 +51,7 @@ type Counter struct {
 	charsPerToken float64
 	wordsPerToken float64
 	vocabFile     string
+	provider      string
 	tokenizers    map[string]Tokenizer
 }
 
@@ -73,6 +76,7 @@ func NewCounter(opts CounterOptions) *Counter {
 		charsPerToken: opts.CharsPerToken,
 		wordsPerToken: opts.WordsPerToken,
 		vocabFile:     opts.VocabFile,
+		provider:      opts.Provider,
 		tokenizers:    make(map[string]Tokenizer),
 	}
 }
@@ -106,14 +110,27 @@ func (c *Counter) Count(text string, model string, all bool) (*CountResult, erro
 func (c *Counter) countAllMethods(text string) []MethodResult {
 	methods := []MethodResult{}
 
-	for _, tokenizer := range c.tokenizers {
+	for model, tokenizer := range c.tokenizers {
+		meta := GetModelMetadata(model)
+
+		// Filter by provider if specified
+		if c.provider != "" && c.provider != "all" {
+			if meta != nil && string(meta.Provider) != c.provider {
+				continue
+			}
+		}
+
 		if count, err := tokenizer.CountTokens(text); err == nil {
-			methods = append(methods, MethodResult{
+			result := MethodResult{
 				Name:        tokenizer.Name(),
 				DisplayName: tokenizer.DisplayName(),
 				Tokens:      count,
 				IsExact:     tokenizer.IsExact(),
-			})
+			}
+			if meta != nil {
+				result.ContextWindow = meta.ContextWindow
+			}
+			methods = append(methods, result)
 		}
 	}
 
@@ -131,12 +148,16 @@ func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult,
 		if err != nil {
 			return nil, err
 		}
-		methods = append(methods, MethodResult{
+		result := MethodResult{
 			Name:        tokenizer.Name(),
 			DisplayName: tokenizer.DisplayName(),
 			Tokens:      count,
 			IsExact:     tokenizer.IsExact(),
-		})
+		}
+		if meta := GetModelMetadata(model); meta != nil {
+			result.ContextWindow = meta.ContextWindow
+		}
+		methods = append(methods, result)
 	} else {
 		methods = append(methods, c.getApproximations(text)...)
 	}

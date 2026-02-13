@@ -23,6 +23,7 @@ var (
 type countOptions struct {
 	model         string
 	vocabFile     string
+	provider      string
 	all           bool
 	jsonOutput    bool
 	showCost      bool
@@ -98,6 +99,7 @@ Open Source Models (tiktoken approximation):
 	cmd.Flags().StringVar(&opts.vocabFile, "vocab-file", "", `path to SentencePiece .model file for exact tokenization
 Required for models that use SentencePiece (e.g., llama-3.1-8b)
 Download vocab files from HuggingFace (see error messages for URLs)`)
+	cmd.Flags().StringVar(&opts.provider, "provider", "all", `filter models by provider (openai, anthropic, meta, deepseek, alibaba, microsoft, all)`)
 	cmd.Flags().BoolVar(&opts.all, "all", false, "show all counting methods")
 	cmd.Flags().BoolVar(&opts.jsonOutput, "json", false, "output in JSON format")
 	cmd.Flags().BoolVar(&opts.showCost, "cost", false, "include cost estimates")
@@ -146,6 +148,16 @@ var sentencePieceVocabURLs = map[string]string{
 	"llama-4":   "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E/blob/main/tokenizer.model",
 }
 
+// isValidProvider checks if a provider name is valid.
+func isValidProvider(provider string) bool {
+	for _, valid := range validProviders {
+		if provider == valid {
+			return true
+		}
+	}
+	return false
+}
+
 // requiresSentencePiece checks if a model can use SentencePiece tokenization
 // and returns the download URL for the vocab file.
 func requiresSentencePiece(model string) (bool, string) {
@@ -157,8 +169,15 @@ func requiresSentencePiece(model string) (bool, string) {
 	return false, ""
 }
 
+// validProviders lists accepted values for the --provider flag.
+var validProviders = []string{"openai", "anthropic", "meta", "deepseek", "alibaba", "microsoft", "all"}
+
 func runCount(ctx context.Context, path string, opts *countOptions) error {
 	display := ui.New(noColor, verbose)
+
+	if !isValidProvider(opts.provider) {
+		return fmt.Errorf("invalid provider %q, valid options: %s", opts.provider, strings.Join(validProviders, ", "))
+	}
 
 	if !isValidModel(opts.model) {
 		display.Warning("Unknown model '%s', using approximation methods", opts.model)
@@ -222,6 +241,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 		CharsPerToken: opts.charsPerToken,
 		WordsPerToken: opts.wordsPerToken,
 		VocabFile:     opts.vocabFile,
+		Provider:      opts.provider,
 	})
 
 	result, err := counter.Count(string(content), opts.model, opts.all)
@@ -245,6 +265,17 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 	}
 
 	return outputTable(display, result)
+}
+
+// formatContextWindow formats context window size for display.
+func formatContextWindow(size int) string {
+	if size >= 1_000_000 {
+		return fmt.Sprintf("%.0fM", float64(size)/1_000_000.0)
+	}
+	if size >= 1000 {
+		return fmt.Sprintf("%.0fK", float64(size)/1000.0)
+	}
+	return fmt.Sprintf("%d", size)
 }
 
 func outputJSON(result *tokens.CountResult) error {
@@ -272,9 +303,9 @@ func outputTable(display *ui.UI, result *tokens.CountResult) error {
 	fmt.Println()
 
 	display.Info("Token Counts by Method:")
-	display.Info("  ┌─────────────────────────┬──────────┬────────────┐")
-	display.Info("  │ Method                  │ Tokens   │ Accuracy   │")
-	display.Info("  ├─────────────────────────┼──────────┼────────────┤")
+	display.Info("  ┌─────────────────────────┬──────────┬────────────┬──────────────────┐")
+	display.Info("  │ Method                  │ Tokens   │ Accuracy   │ Context Usage    │")
+	display.Info("  ├─────────────────────────┼──────────┼────────────┼──────────────────┤")
 
 	for _, method := range result.Methods {
 		accuracy := "Approx"
@@ -284,11 +315,17 @@ func outputTable(display *ui.UI, result *tokens.CountResult) error {
 			accuracy = "Estimated"
 		}
 
-		display.Info("  │ %-23s │ %-8d │ %-10s │",
-			method.DisplayName, method.Tokens, accuracy)
+		contextStr := ""
+		if method.ContextWindow > 0 {
+			pct := float64(method.Tokens) / float64(method.ContextWindow) * 100.0
+			contextStr = fmt.Sprintf("%.1f%% of %s", pct, formatContextWindow(method.ContextWindow))
+		}
+
+		display.Info("  │ %-23s │ %-8d │ %-10s │ %-16s │",
+			method.DisplayName, method.Tokens, accuracy, contextStr)
 	}
 
-	display.Info("  └─────────────────────────┴──────────┴────────────┘")
+	display.Info("  └─────────────────────────┴──────────┴────────────┴──────────────────┘")
 
 	if len(result.Costs) > 0 {
 		fmt.Println()
