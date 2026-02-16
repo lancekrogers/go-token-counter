@@ -294,8 +294,8 @@ func TestCounter_ProviderFilter_Anthropic(t *testing.T) {
 		if strings.Contains(method.Name, "claude") {
 			hasClaudeMethod = true
 		}
-		// tiktoken encodings should not appear for anthropic filter
-		if strings.Contains(method.Name, "tiktoken") {
+		// BPE encodings should not appear for anthropic filter
+		if strings.Contains(method.Name, "bpe_") {
 			t.Errorf("Provider filter 'anthropic' should exclude %s", method.Name)
 		}
 	}

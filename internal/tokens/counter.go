@@ -176,7 +176,7 @@ func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult,
 				return nil, err
 			}
 			methods = append(methods, MethodResult{
-				Name:        fmt.Sprintf("tiktoken_%s", strings.ReplaceAll(model, "-", "_")),
+				Name:        fmt.Sprintf("bpe_%s", strings.ReplaceAll(model, "-", "_")),
 				DisplayName: fmt.Sprintf("%s (%s)", meta.Encoding, model),
 				Tokens:      count,
 				IsExact:     tokenizer.IsExact(),
@@ -247,10 +247,10 @@ func (c *Counter) initializeTokenizers() {
 	}
 
 	// One tokenizer per encoding, not one per model
-	if tokenizer, err := NewTiktokenByEncoding("o200k_base"); err == nil {
+	if tokenizer, err := NewBPETokenizerByEncoding("o200k_base"); err == nil {
 		c.tokenizers["o200k_base"] = tokenizer
 	}
-	if tokenizer, err := NewTiktokenByEncoding("cl100k_base"); err == nil {
+	if tokenizer, err := NewBPETokenizerByEncoding("cl100k_base"); err == nil {
 		c.tokenizers["cl100k_base"] = tokenizer
 	}
 	c.tokenizers["claude_approx"] = NewClaudeApproximator()

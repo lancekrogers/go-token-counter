@@ -101,7 +101,7 @@ Anthropic Models:
   Claude 4 series:  claude-4-opus, claude-4-sonnet, claude-4.5-sonnet
   Claude 3 series:  claude-3.7-sonnet, claude-3.5-sonnet, claude-3-opus, claude-3-sonnet, claude-3-haiku
 
-Open Source Models (tiktoken approximation):
+Open Source Models (BPE approximation):
   Llama:            llama-3.1-8b, llama-3.1-70b, llama-3.1-405b, llama-4-scout, llama-4-maverick
   DeepSeek:         deepseek-v2, deepseek-v3, deepseek-coder-v2
   Qwen:             qwen-2.5-7b, qwen-2.5-14b, qwen-2.5-72b, qwen-3-72b

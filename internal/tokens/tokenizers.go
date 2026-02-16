@@ -10,49 +10,49 @@ import (
 	"github.com/lancekrogers/go-token-counter/internal/spm"
 )
 
-// TiktokenTokenizer implements exact tokenization using a tiktoken encoding.
-type TiktokenTokenizer struct {
+// BPETokenizerWrapper implements exact tokenization using a BPE encoding.
+type BPETokenizerWrapper struct {
 	encodingName string
-	encoding     *bpe.Tiktoken
+	tokenizer    *bpe.BPETokenizer
 }
 
-// NewTiktokenTokenizer creates a new tiktoken-based tokenizer for a specific model.
-func NewTiktokenTokenizer(model string) (*TiktokenTokenizer, error) {
+// NewBPETokenizer creates a new BPE-based tokenizer for a specific model.
+func NewBPETokenizer(model string) (*BPETokenizerWrapper, error) {
 	encodingName := getEncodingForModel(model)
-	return NewTiktokenByEncoding(encodingName)
+	return NewBPETokenizerByEncoding(encodingName)
 }
 
-// NewTiktokenByEncoding creates a tokenizer directly from an encoding name.
-func NewTiktokenByEncoding(encodingName string) (*TiktokenTokenizer, error) {
-	encoding, err := bpe.GetEncoding(encodingName)
+// NewBPETokenizerByEncoding creates a tokenizer directly from an encoding name.
+func NewBPETokenizerByEncoding(encodingName string) (*BPETokenizerWrapper, error) {
+	tokenizer, err := bpe.NewEncoderByName(encodingName)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting encoding").WithField("encoding", encodingName)
 	}
 
-	return &TiktokenTokenizer{
+	return &BPETokenizerWrapper{
 		encodingName: encodingName,
-		encoding:     encoding,
+		tokenizer:    tokenizer,
 	}, nil
 }
 
-// CountTokens counts tokens using tiktoken.
-func (t *TiktokenTokenizer) CountTokens(text string) (int, error) {
-	tokens := t.encoding.Encode(text, nil, nil)
+// CountTokens counts tokens using BPE tokenization.
+func (t *BPETokenizerWrapper) CountTokens(text string) (int, error) {
+	tokens := t.tokenizer.Encode(text, nil, nil)
 	return len(tokens), nil
 }
 
 // Name returns the machine-readable tokenizer identifier.
-func (t *TiktokenTokenizer) Name() string {
-	return fmt.Sprintf("tiktoken_%s", t.encodingName)
+func (t *BPETokenizerWrapper) Name() string {
+	return fmt.Sprintf("bpe_%s", t.encodingName)
 }
 
 // DisplayName returns the human-readable tokenizer name.
-func (t *TiktokenTokenizer) DisplayName() string {
+func (t *BPETokenizerWrapper) DisplayName() string {
 	return t.encodingName
 }
 
-// IsExact returns true for tiktoken tokenizers.
-func (t *TiktokenTokenizer) IsExact() bool {
+// IsExact returns true for BPE tokenizers.
+func (t *BPETokenizerWrapper) IsExact() bool {
 	return true
 }
 

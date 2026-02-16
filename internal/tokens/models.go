@@ -29,7 +29,7 @@ const (
 type ModelMetadata struct {
 	Name             string   // Model identifier (e.g., "gpt-4o", "claude-4-sonnet")
 	Provider         Provider // Provider who created the model
-	Encoding         string   // Encoding name for tiktoken (e.g., "o200k_base", "cl100k_base")
+	Encoding         string   // BPE encoding name (e.g., "o200k_base", "cl100k_base")
 	ContextWindow    int      // Maximum context window size in tokens
 	InputPricePer1M  float64  // Input price per 1M tokens in USD
 	OutputPricePer1M float64  // Output price per 1M tokens in USD
@@ -278,7 +278,7 @@ func init() {
 		OutputPricePer1M: 15.00,
 	}
 
-	// Meta Models - Llama 3 series (tiktoken cl100k_base approximation)
+	// Meta Models - Llama 3 series (cl100k_base BPE approximation)
 	// Note: Llama uses its own tokenizer, but cl100k_base provides reasonable approximation
 	modelRegistry["llama-3.1-8b"] = ModelMetadata{
 		Name:             "llama-3.1-8b",
@@ -321,7 +321,7 @@ func init() {
 		OutputPricePer1M: 0.0,
 	}
 
-	// DeepSeek Models (tiktoken cl100k_base approximation)
+	// DeepSeek Models (cl100k_base BPE approximation)
 	modelRegistry["deepseek-v2"] = ModelMetadata{
 		Name:             "deepseek-v2",
 		Provider:         ProviderDeepSeek,
@@ -347,7 +347,7 @@ func init() {
 		OutputPricePer1M: 0.0,
 	}
 
-	// Alibaba Models - Qwen 2/3 series (tiktoken cl100k_base compatible)
+	// Alibaba Models - Qwen 2/3 series (cl100k_base BPE compatible)
 	modelRegistry["qwen-2.5-7b"] = ModelMetadata{
 		Name:             "qwen-2.5-7b",
 		Provider:         ProviderAlibaba,
@@ -381,7 +381,7 @@ func init() {
 		OutputPricePer1M: 0.0,
 	}
 
-	// Microsoft Models - Phi-3 series (tiktoken cl100k_base compatible)
+	// Microsoft Models - Phi-3 series (cl100k_base BPE compatible)
 	modelRegistry["phi-3-mini"] = ModelMetadata{
 		Name:             "phi-3-mini",
 		Provider:         ProviderMicrosoft,

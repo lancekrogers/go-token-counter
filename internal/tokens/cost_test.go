@@ -7,7 +7,7 @@ import (
 func TestCalculateCosts(t *testing.T) {
 	methods := []MethodResult{
 		{
-			Name:    "tiktoken_gpt_4o",
+			Name:    "bpe_gpt_4o",
 			Tokens:  1000,
 			IsExact: true,
 		},
@@ -83,7 +83,7 @@ func TestGetTokenCount(t *testing.T) {
 			name: "Prefers exact GPT count",
 			methods: []MethodResult{
 				{Name: "character_based", Tokens: 100, IsExact: false},
-				{Name: "tiktoken_gpt_4o", Tokens: 80, IsExact: true},
+				{Name: "bpe_gpt_4o", Tokens: 80, IsExact: true},
 			},
 			expected: 80,
 		},
@@ -172,7 +172,7 @@ func TestGetPricingForModel(t *testing.T) {
 
 func TestCalculateCosts_PerMillionFormat(t *testing.T) {
 	methods := []MethodResult{
-		{Name: "tiktoken_gpt_5", Tokens: 1_000_000, IsExact: true},
+		{Name: "bpe_gpt_5", Tokens: 1_000_000, IsExact: true},
 	}
 
 	costs := CalculateCosts(methods)

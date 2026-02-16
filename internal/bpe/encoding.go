@@ -28,8 +28,8 @@ const (
 	EncodingR50kBase   = "r50k_base"
 )
 
-// Encoding holds the definition for a BPE encoding.
-type Encoding struct {
+// Definition holds the specification for a BPE encoding scheme.
+type Definition struct {
 	Name           string
 	PatStr         string
 	MergeableRanks map[string]int
@@ -38,35 +38,35 @@ type Encoding struct {
 }
 
 var (
-	encodingMap = make(map[string]*Encoding)
-	mu          sync.RWMutex
+	definitionCache = make(map[string]*Definition)
+	mu              sync.RWMutex
 )
 
-func getEncoding(encodingName string) (*Encoding, error) {
+func getDefinition(encodingName string) (*Definition, error) {
 	mu.RLock()
-	enc, ok := encodingMap[encodingName]
+	def, ok := definitionCache[encodingName]
 	mu.RUnlock()
 	if ok {
-		return enc, nil
+		return def, nil
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
 
 	// Double-check after acquiring write lock.
-	if enc, ok := encodingMap[encodingName]; ok {
-		return enc, nil
+	if def, ok := definitionCache[encodingName]; ok {
+		return def, nil
 	}
 
-	enc, err := initEncoding(encodingName)
+	def, err := initDefinition(encodingName)
 	if err != nil {
 		return nil, err
 	}
-	encodingMap[encodingName] = enc
-	return enc, nil
+	definitionCache[encodingName] = def
+	return def, nil
 }
 
-func initEncoding(encodingName string) (*Encoding, error) {
+func initDefinition(encodingName string) (*Definition, error) {
 	switch encodingName {
 	case EncodingO200kBase:
 		return o200kBase()
@@ -83,7 +83,7 @@ func initEncoding(encodingName string) (*Encoding, error) {
 	}
 }
 
-func o200kBase() (*Encoding, error) {
+func o200kBase() (*Definition, error) {
 	ranks, err := loadEmbeddedVocab("o200k_base")
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func o200kBase() (*Encoding, error) {
 		`\s+(?!\S)`,
 		`\s+`,
 	}
-	return &Encoding{
+	return &Definition{
 		Name:           EncodingO200kBase,
 		PatStr:         strings.Join(pats, "|"),
 		MergeableRanks: ranks,
@@ -105,12 +105,12 @@ func o200kBase() (*Encoding, error) {
 	}, nil
 }
 
-func cl100kBase() (*Encoding, error) {
+func cl100kBase() (*Definition, error) {
 	ranks, err := loadEmbeddedVocab("cl100k_base")
 	if err != nil {
 		return nil, err
 	}
-	return &Encoding{
+	return &Definition{
 		Name:           EncodingCL100kBase,
 		PatStr:         `(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+`,
 		MergeableRanks: ranks,
@@ -122,12 +122,12 @@ func cl100kBase() (*Encoding, error) {
 	}, nil
 }
 
-func p50kBase() (*Encoding, error) {
+func p50kBase() (*Definition, error) {
 	ranks, err := loadEmbeddedVocab("p50k_base")
 	if err != nil {
 		return nil, err
 	}
-	return &Encoding{
+	return &Definition{
 		Name:           EncodingP50kBase,
 		PatStr:         `'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+`,
 		MergeableRanks: ranks,
@@ -136,12 +136,12 @@ func p50kBase() (*Encoding, error) {
 	}, nil
 }
 
-func p50kEdit() (*Encoding, error) {
+func p50kEdit() (*Definition, error) {
 	ranks, err := loadEmbeddedVocab("p50k_base")
 	if err != nil {
 		return nil, err
 	}
-	return &Encoding{
+	return &Definition{
 		Name:           EncodingP50kEdit,
 		PatStr:         `'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+`,
 		MergeableRanks: ranks,
@@ -149,12 +149,12 @@ func p50kEdit() (*Encoding, error) {
 	}, nil
 }
 
-func r50kBase() (*Encoding, error) {
+func r50kBase() (*Definition, error) {
 	ranks, err := loadEmbeddedVocab("r50k_base")
 	if err != nil {
 		return nil, err
 	}
-	return &Encoding{
+	return &Definition{
 		Name:           EncodingR50kBase,
 		PatStr:         `'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+`,
 		MergeableRanks: ranks,
@@ -163,45 +163,45 @@ func r50kBase() (*Encoding, error) {
 	}, nil
 }
 
-// GetEncoding returns a Tiktoken for the named encoding.
-func GetEncoding(encodingName string) (*Tiktoken, error) {
-	enc, err := getEncoding(encodingName)
+// NewEncoderByName returns a BPETokenizer for the named encoding.
+func NewEncoderByName(encodingName string) (*BPETokenizer, error) {
+	def, err := getDefinition(encodingName)
 	if err != nil {
 		return nil, err
 	}
-	pbe, err := NewCoreBPE(enc.MergeableRanks, enc.SpecialTokens, enc.PatStr)
+	enc, err := NewEncoder(def.MergeableRanks, def.SpecialTokens, def.PatStr)
 	if err != nil {
 		return nil, err
 	}
-	specialTokensSet := make(map[string]any, len(enc.SpecialTokens))
-	for k := range enc.SpecialTokens {
+	specialTokensSet := make(map[string]any, len(def.SpecialTokens))
+	for k := range def.SpecialTokens {
 		specialTokensSet[k] = true
 	}
-	return newTiktoken(pbe, enc, specialTokensSet), nil
+	return newBPETokenizer(enc, def, specialTokensSet), nil
 }
 
-// Tiktoken is the main tokenizer that wraps CoreBPE.
-type Tiktoken struct {
-	bpe              *CoreBPE
-	pbeEncoding      *Encoding
+// BPETokenizer is the main tokenizer that wraps a BPE Encoder.
+type BPETokenizer struct {
+	encoder          *Encoder
+	definition       *Definition
 	specialTokensSet map[string]any
 }
 
-func newTiktoken(bpe *CoreBPE, encoding *Encoding, specialTokensSet map[string]any) *Tiktoken {
-	return &Tiktoken{
-		bpe:              bpe,
-		pbeEncoding:      encoding,
+func newBPETokenizer(encoder *Encoder, definition *Definition, specialTokensSet map[string]any) *BPETokenizer {
+	return &BPETokenizer{
+		encoder:          encoder,
+		definition:       definition,
 		specialTokensSet: specialTokensSet,
 	}
 }
 
 // Encode tokenizes text with optional special token handling.
-func (t *Tiktoken) Encode(text string, allowedSpecial []string, disallowedSpecial []string) []int {
+func (tok *BPETokenizer) Encode(text string, allowedSpecial []string, disallowedSpecial []string) []int {
 	var allowedSpecialSet map[string]any
 	if len(allowedSpecial) == 0 {
 		allowedSpecialSet = map[string]any{}
 	} else if len(allowedSpecial) == 1 && allowedSpecial[0] == "all" {
-		allowedSpecialSet = t.specialTokensSet
+		allowedSpecialSet = tok.specialTokensSet
 	} else {
 		allowedSpecialSet = make(map[string]any, len(allowedSpecial))
 		for _, v := range allowedSpecial {
@@ -214,32 +214,32 @@ func (t *Tiktoken) Encode(text string, allowedSpecial []string, disallowedSpecia
 		disallowedSpecialSet[v] = nil
 	}
 	if len(disallowedSpecial) == 1 && disallowedSpecial[0] == "all" {
-		disallowedSpecialSet = difference(t.specialTokensSet, allowedSpecialSet)
+		disallowedSpecialSet = difference(tok.specialTokensSet, allowedSpecialSet)
 	}
 
 	if len(disallowedSpecialSet) > 0 {
-		specialRegex := t.specialTokenRegex(disallowedSpecialSet)
-		m := findRegex2StringMatch(text, specialRegex)
+		specialRegex := tok.specialTokenRegex(disallowedSpecialSet)
+		m := findMatch(text, specialRegex)
 		if m != "" {
 			panic(fmt.Sprintf("text contains disallowed special token %s", m))
 		}
 	}
 
-	tokens, _ := t.bpe.encodeNative(text, allowedSpecialSet)
+	tokens, _ := tok.encoder.encode(text, allowedSpecialSet)
 	return tokens
 }
 
 // EncodeOrdinary tokenizes text without special token handling.
-func (t *Tiktoken) EncodeOrdinary(text string) []int {
-	return t.bpe.encodeOrdinaryNative(text)
+func (tok *BPETokenizer) EncodeOrdinary(text string) []int {
+	return tok.encoder.encodeOrdinary(text)
 }
 
 // Decode converts token IDs back to text.
-func (t *Tiktoken) Decode(tokens []int) string {
-	return string(t.bpe.decodeNative(tokens))
+func (tok *BPETokenizer) Decode(tokens []int) string {
+	return string(tok.encoder.decode(tokens))
 }
 
-func (t *Tiktoken) specialTokenRegex(disallowedSpecialSet map[string]any) *regexp2.Regexp {
+func (tok *BPETokenizer) specialTokenRegex(disallowedSpecialSet map[string]any) *regexp2.Regexp {
 	strs := make([]string, 0, len(disallowedSpecialSet))
 	for k := range disallowedSpecialSet {
 		strs = append(strs, regexp.QuoteMeta(k))
@@ -247,7 +247,7 @@ func (t *Tiktoken) specialTokenRegex(disallowedSpecialSet map[string]any) *regex
 	return regexp2.MustCompile(strings.Join(strs, "|"), regexp2.None)
 }
 
-func findRegex2StringMatch(text string, reg *regexp2.Regexp) string {
+func findMatch(text string, reg *regexp2.Regexp) string {
 	m, _ := reg.FindStringMatch(text)
 	if m == nil {
 		return ""
