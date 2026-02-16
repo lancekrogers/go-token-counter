@@ -4,9 +4,16 @@ set working-directory := '..'
 @default:
     just --list --justfile {{source_file()}}
 
+# Run all tests (unit + integration)
+all: unit integration
+
 # Run unit tests
 unit:
-    go test ./... -v
+    go test ./... -v -short
+
+# Run integration tests
+integration:
+    go test ./... -v -run Integration
 
 # Run tests with coverage
 coverage:
