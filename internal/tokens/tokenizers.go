@@ -5,16 +5,15 @@ import (
 	"os"
 	"strings"
 
-	sentencepiece "github.com/eliben/go-sentencepiece"
-	"github.com/pkoukk/tiktoken-go"
-
+	"github.com/lancekrogers/go-token-counter/internal/bpe"
 	"github.com/lancekrogers/go-token-counter/internal/errors"
+	"github.com/lancekrogers/go-token-counter/internal/sentencepiece"
 )
 
 // TiktokenTokenizer implements exact tokenization using a tiktoken encoding.
 type TiktokenTokenizer struct {
 	encodingName string
-	encoding     *tiktoken.Tiktoken
+	encoding     *bpe.Tiktoken
 }
 
 // NewTiktokenTokenizer creates a new tiktoken-based tokenizer for a specific model.
@@ -25,7 +24,7 @@ func NewTiktokenTokenizer(model string) (*TiktokenTokenizer, error) {
 
 // NewTiktokenByEncoding creates a tokenizer directly from an encoding name.
 func NewTiktokenByEncoding(encodingName string) (*TiktokenTokenizer, error) {
-	encoding, err := tiktoken.GetEncoding(encodingName)
+	encoding, err := bpe.GetEncoding(encodingName)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting encoding").WithField("encoding", encodingName)
 	}
