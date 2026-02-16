@@ -83,8 +83,8 @@ tcount --json document.md
 ### Alibaba (Qwen)
 | Model | Method | Context |
 |-------|--------|---------|
-| `qwen-2.5-7b`, `qwen-2.5-14b`, `qwen-2.5-72b` | tiktoken approx | 33K |
-| `qwen-3-72b` | tiktoken approx | 33K |
+| `qwen-2.5-7b`, `qwen-2.5-14b`, `qwen-2.5-72b` | tiktoken approx | 32K |
+| `qwen-3-72b` | tiktoken approx | 32K |
 
 ### Microsoft (Phi)
 | Model | Method | Context |
@@ -115,6 +115,7 @@ tcount [file|directory] [flags]
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--model` | | Specific model tokenizer |
+| `--models` | `-m` | Show encoding-to-model lookup table |
 | `--provider` | | Filter by provider: `openai`, `anthropic`, `meta`, `deepseek`, `alibaba`, `microsoft`, `all` |
 | `--vocab-file` | | Path to SentencePiece `.model` file for exact Llama tokenization |
 | `--all` | | Show all counting methods |
@@ -265,7 +266,7 @@ just test unit             # Unit tests only
 just test integration      # Integration tests only
 just test coverage         # Coverage report
 just test bench            # Benchmarks
-just cross all             # Cross-compile for all platforms
+just release all            # Cross-compile for all platforms
 ```
 
 ## License
