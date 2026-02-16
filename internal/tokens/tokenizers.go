@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
+	sentencepiece "github.com/eliben/go-sentencepiece"
 	"github.com/lancekrogers/go-token-counter/internal/bpe"
 	"github.com/lancekrogers/go-token-counter/internal/errors"
-	"github.com/lancekrogers/go-token-counter/internal/spm"
 )
 
 // BPETokenizerWrapper implements exact tokenization using a BPE encoding.
@@ -135,7 +135,7 @@ func (c *ClaudeApproximator) IsExact() bool {
 // SPMTokenizerWrapper uses a .model vocab file for exact tokenization.
 // Supports models like Llama 2, Mistral, and Gemma.
 type SPMTokenizerWrapper struct {
-	tokenizer *spm.Tokenizer
+	processor *sentencepiece.Processor
 	modelPath string
 }
 
@@ -153,20 +153,20 @@ func NewSPMTokenizer(modelPath string) (*SPMTokenizerWrapper, error) {
 		return nil, fmt.Errorf("failed to access vocab file: %w", err)
 	}
 
-	tokenizer, err := spm.NewTokenizerFromPath(modelPath)
+	processor, err := sentencepiece.NewProcessorFromPath(modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load SentencePiece model: %w", err)
 	}
 
 	return &SPMTokenizerWrapper{
-		tokenizer: tokenizer,
+		processor: processor,
 		modelPath: modelPath,
 	}, nil
 }
 
 // CountTokens returns the token count using the SentencePiece model.
 func (t *SPMTokenizerWrapper) CountTokens(text string) (int, error) {
-	tokens := t.tokenizer.Encode(text)
+	tokens := t.processor.Encode(text)
 	return len(tokens), nil
 }
 

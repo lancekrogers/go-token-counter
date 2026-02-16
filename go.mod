@@ -5,10 +5,10 @@ go 1.25.6
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/dlclark/regexp2 v1.11.5
+	github.com/eliben/go-sentencepiece v0.7.0
 	github.com/muesli/termenv v0.16.0
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
 	github.com/spf13/cobra v1.10.2
-	google.golang.org/protobuf v1.34.2
 )
 
 require (
@@ -25,4 +25,5 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sys v0.34.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 )
