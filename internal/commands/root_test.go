@@ -114,27 +114,6 @@ func TestRequiresSentencePiece(t *testing.T) {
 	}
 }
 
-func TestCorner(t *testing.T) {
-	tests := []struct {
-		joint    string
-		width    int
-		expected string
-	}{
-		{"┌", 10, "┌──────────"},
-		{"┼", 5, "┼─────"},
-		{"└", 1, "└─"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.joint, func(t *testing.T) {
-			result := corner(tt.joint, tt.width)
-			if result != tt.expected {
-				t.Errorf("corner(%q, %d) = %q, want %q", tt.joint, tt.width, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestValidModels(t *testing.T) {
 	models := validModels()
 	if len(models) == 0 {
@@ -158,7 +137,7 @@ func TestValidModels(t *testing.T) {
 }
 
 func TestNewRootCmd(t *testing.T) {
-	cmd := newRootCmd()
+	cmd := newRootCmd("test")
 	if cmd == nil {
 		t.Fatal("newRootCmd() returned nil")
 	}

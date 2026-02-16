@@ -7,6 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
 	"github.com/lancekrogers/go-token-counter/internal/errors"
@@ -33,19 +36,20 @@ type countOptions struct {
 	wordsPerToken float64
 }
 
-// Execute runs the root command.
-func Execute() {
-	if err := newRootCmd().Execute(); err != nil {
+// Execute runs the root command with the given version string.
+func Execute(version string) {
+	if err := newRootCmd(version).Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func newRootCmd() *cobra.Command {
+func newRootCmd(version string) *cobra.Command {
 	opts := &countOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "tcount [file|directory]",
+		Use:     "tcount [file|directory]",
+		Version: version,
 		Short: "Count tokens in files using various LLM tokenizers",
 		Long: `Count tokens in a file or directory using multiple tokenization methods.
 
@@ -69,6 +73,11 @@ When counting a directory with --recursive, the command:
   tcount -r ./src                                          # Count all files in directory
   tcount -r --models ./project                             # Show encoding→model lookup`,
 		Args: cobra.ExactArgs(1),
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if noColor {
+				lipgloss.SetColorProfile(termenv.Ascii)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCount(cmd.Context(), args[0], opts)
 		},
@@ -275,62 +284,41 @@ func outputJSON(result *tokens.CountResult) error {
 	return encoder.Encode(result)
 }
 
-func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) error {
+// styles returns lipgloss styles for output rendering.
+func styles() (title, section, label, valStyle lipgloss.Style) {
+	purple := lipgloss.Color("99")
+	dim := lipgloss.Color("245")
+
+	title = lipgloss.NewStyle().Bold(true).Foreground(purple)
+	section = lipgloss.NewStyle().Bold(true).Foreground(purple)
+	label = lipgloss.NewStyle().Foreground(dim)
+	valStyle = lipgloss.NewStyle()
+	return
+}
+
+func outputTable(_ *ui.UI, result *tokens.CountResult, showModels bool) error {
+	titleStyle, sectionStyle, labelStyle, valStyle := styles()
+
+	// Title
+	path := result.FilePath
 	if result.IsDirectory {
-		display.Info("Token Count Report for: %s (directory)", result.FilePath)
-	} else {
-		display.Info("Token Count Report for: %s", result.FilePath)
+		path += " (directory)"
 	}
-	display.Info("%s", strings.Repeat("=", 55))
+	fmt.Println(titleStyle.Render("Token Count Report for: " + path))
 	fmt.Println()
 
-	display.Info("Basic Statistics:")
+	// Basic Statistics
+	fmt.Println(sectionStyle.Render("Basic Statistics"))
 	if result.IsDirectory {
-		display.Info("  Files:          %s", formatInt(result.FileCount))
+		fmt.Printf("  %s %s\n", labelStyle.Render("Files:"), valStyle.Render(formatInt(result.FileCount)))
 	}
-	display.Info("  Characters:     %s", formatInt(result.Characters))
-	display.Info("  Words:          %s", formatInt(result.Words))
-	display.Info("  Lines:          %s", formatInt(result.Lines))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Characters:"), valStyle.Render(formatInt(result.Characters)))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Words:"), valStyle.Render(formatInt(result.Words)))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Lines:"), valStyle.Render(formatInt(result.Lines)))
 	fmt.Println()
 
-	// Calculate dynamic column widths
-	methodWidth := len("Method")
-	tokenWidth := len("Tokens")
-	accuracyWidth := len("Accuracy")
-
-	for _, method := range result.Methods {
-		if len(method.DisplayName) > methodWidth {
-			methodWidth = len(method.DisplayName)
-		}
-		tokenStr := formatInt(method.Tokens)
-		if len(tokenStr) > tokenWidth {
-			tokenWidth = len(tokenStr)
-		}
-	}
-
-	// Add padding
-	methodWidth += 2
-	tokenWidth += 2
-	if accuracyWidth < 11 {
-		accuracyWidth = 11
-	}
-
-	display.Info("Token Counts by Method:")
-	display.Info("  %s%s%s%s",
-		corner("┌", methodWidth),
-		corner("┬", tokenWidth),
-		corner("┬", accuracyWidth),
-		"┐")
-	display.Info("  │ %-*s │ %-*s │ %-*s │",
-		methodWidth-2, "Method",
-		tokenWidth-2, "Tokens",
-		accuracyWidth-2, "Accuracy")
-	display.Info("  %s%s%s%s",
-		corner("├", methodWidth),
-		corner("┼", tokenWidth),
-		corner("┼", accuracyWidth),
-		"┤")
-
+	// Build token table rows
+	rows := make([][]string, 0, len(result.Methods))
 	for _, method := range result.Methods {
 		accuracy := "Approx"
 		if method.IsExact {
@@ -338,40 +326,63 @@ func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) er
 		} else if method.Name == "claude_3_approx" {
 			accuracy = "Estimated"
 		}
-
-		display.Info("  │ %-*s │ %-*s │ %-*s │",
-			methodWidth-2, method.DisplayName,
-			tokenWidth-2, formatInt(method.Tokens),
-			accuracyWidth-2, accuracy)
+		rows = append(rows, []string{method.DisplayName, formatInt(method.Tokens), accuracy})
 	}
 
-	display.Info("  %s%s%s%s",
-		corner("└", methodWidth),
-		corner("┴", tokenWidth),
-		corner("┴", accuracyWidth),
-		"┘")
+	// Styled table
+	purple := lipgloss.Color("99")
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(purple).Align(lipgloss.Center)
+	cellStyle := lipgloss.NewStyle().PaddingLeft(1).PaddingRight(1)
+	tokenCellStyle := cellStyle.Align(lipgloss.Right)
 
+	t := table.New().
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(purple)).
+		Headers("Method", "Tokens", "Accuracy").
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return headerStyle
+			}
+			// Tokens column: right-aligned
+			if col == 1 {
+				return tokenCellStyle
+			}
+			// Accuracy column: color-coded
+			if col == 2 && row >= 0 && row < len(rows) {
+				switch rows[row][2] {
+				case "Exact":
+					return cellStyle.Foreground(lipgloss.Color("10"))
+				case "Estimated":
+					return cellStyle.Foreground(lipgloss.Color("11"))
+				default:
+					return cellStyle.Foreground(lipgloss.Color("245"))
+				}
+			}
+			return cellStyle
+		})
+
+	fmt.Println(sectionStyle.Render("Token Counts by Method"))
+	fmt.Println(t)
+
+	// Cost section
 	if len(result.Costs) > 0 {
 		fmt.Println()
-		display.Info("Cost Estimates (Input):")
-
+		fmt.Println(sectionStyle.Render("Cost Estimates (Input)"))
 		for _, cost := range result.Costs {
-			display.Info("  %-16s $%.4f ($%.2f/1M tokens)",
-				cost.Model+":", cost.Cost, cost.RatePer1M)
+			fmt.Printf("  %s $%.4f ($%.2f/1M tokens)\n",
+				labelStyle.Render(cost.Model+":"),
+				cost.Cost, cost.RatePer1M)
 		}
 	}
 
+	// Model lookup
 	if showModels {
 		fmt.Println()
-		outputModelLookup(display)
+		outputModelLookup(sectionStyle, labelStyle)
 	}
 
 	return nil
-}
-
-// corner builds a box-drawing segment: joint + repeated "─" + "─" padding.
-func corner(joint string, width int) string {
-	return joint + strings.Repeat("─", width)
 }
 
 // formatInt formats an integer with comma thousand separators.
@@ -398,18 +409,17 @@ func formatInt(n int) string {
 }
 
 // outputModelLookup prints the encoding→model mapping.
-func outputModelLookup(display *ui.UI) {
-	display.Info("Model Lookup:")
+func outputModelLookup(sectionStyle, labelStyle lipgloss.Style) {
+	fmt.Println(sectionStyle.Render("Model Lookup"))
 
 	byEncoding := tokens.ModelsByEncoding()
 
-	// Deterministic order
 	order := []string{"o200k_base", "cl100k_base", "claude_approx"}
 	for _, enc := range order {
 		models, ok := byEncoding[enc]
 		if !ok {
 			continue
 		}
-		display.Info("  %-14s %s", enc+":", strings.Join(models, ", "))
+		fmt.Printf("  %s %s\n", labelStyle.Render(enc+":"), strings.Join(models, ", "))
 	}
 }

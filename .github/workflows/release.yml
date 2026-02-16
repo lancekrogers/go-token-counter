@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run tests
+        run: go test ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get release version
+        id: version
+        run: echo "tag=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release archives and compute checksums
+        id: checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
+
+          declare -A FILES=(
+            ["darwin_arm64"]="tcount_${VERSION}_darwin_arm64.tar.gz"
+            ["darwin_amd64"]="tcount_${VERSION}_darwin_amd64.tar.gz"
+            ["linux_amd64"]="tcount_${VERSION}_linux_amd64.tar.gz"
+            ["linux_arm64"]="tcount_${VERSION}_linux_arm64.tar.gz"
+          )
+
+          for key in "${!FILES[@]}"; do
+            file="${FILES[$key]}"
+            curl -sL "${BASE_URL}/${file}" -o "${file}"
+            sha=$(sha256sum "${file}" | awk '{print $1}')
+            echo "sha_${key}=${sha}" >> "$GITHUB_OUTPUT"
+            echo "url_${key}=${BASE_URL}/${file}" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: lancekrogers/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        env:
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > homebrew-tap/Formula/tcount.rb << 'FORMULA'
+          class Tcount < Formula
+            desc "Count tokens in files using various LLM tokenizers"
+            homepage "https://github.com/lancekrogers/go-token-counter"
+            version "REPLACE_VERSION"
+            license "MIT"
+
+            if OS.mac? && Hardware::CPU.arm?
+              url "REPLACE_URL_DARWIN_ARM64"
+              sha256 "REPLACE_SHA_DARWIN_ARM64"
+            elsif OS.mac?
+              url "REPLACE_URL_DARWIN_AMD64"
+              sha256 "REPLACE_SHA_DARWIN_AMD64"
+            elsif OS.linux? && Hardware::CPU.arm?
+              url "REPLACE_URL_LINUX_ARM64"
+              sha256 "REPLACE_SHA_LINUX_ARM64"
+            elsif OS.linux?
+              url "REPLACE_URL_LINUX_AMD64"
+              sha256 "REPLACE_SHA_LINUX_AMD64"
+            end
+
+            def install
+              bin.install "tcount"
+            end
+
+            test do
+              system bin/"tcount", "--version"
+            end
+          end
+          FORMULA
+
+          # Replace placeholders
+          sed -i "s|REPLACE_VERSION|${VERSION}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_URL_DARWIN_ARM64|${{ steps.checksums.outputs.url_darwin_arm64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_SHA_DARWIN_ARM64|${{ steps.checksums.outputs.sha_darwin_arm64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_URL_DARWIN_AMD64|${{ steps.checksums.outputs.url_darwin_amd64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_SHA_DARWIN_AMD64|${{ steps.checksums.outputs.sha_darwin_amd64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_URL_LINUX_ARM64|${{ steps.checksums.outputs.url_linux_arm64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_SHA_LINUX_ARM64|${{ steps.checksums.outputs.sha_linux_arm64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_URL_LINUX_AMD64|${{ steps.checksums.outputs.url_linux_amd64 }}|g" homebrew-tap/Formula/tcount.rb
+          sed -i "s|REPLACE_SHA_LINUX_AMD64|${{ steps.checksums.outputs.sha_linux_amd64 }}|g" homebrew-tap/Formula/tcount.rb
+
+      - name: Commit and push formula
+        working-directory: homebrew-tap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/tcount.rb
+          git commit -m "Update tcount to v${{ steps.version.outputs.tag }}"
+          git push
