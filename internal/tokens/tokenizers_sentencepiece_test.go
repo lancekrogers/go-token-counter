@@ -17,7 +17,7 @@ func testModelPath(t *testing.T) string {
 	return path
 }
 
-func TestNewSentencePieceTokenizer(t *testing.T) {
+func TestNewSPMTokenizer(t *testing.T) {
 	tests := []struct {
 		name      string
 		modelPath string
@@ -46,7 +46,7 @@ func TestNewSentencePieceTokenizer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tok, err := NewSentencePieceTokenizer(tt.modelPath)
+			tok, err := NewSPMTokenizer(tt.modelPath)
 			if tt.wantError {
 				if err == nil {
 					t.Error("expected error but got none")
@@ -71,7 +71,7 @@ func TestNewSentencePieceTokenizer(t *testing.T) {
 	}
 }
 
-func TestNewSentencePieceTokenizer_CorruptFile(t *testing.T) {
+func TestNewSPMTokenizer_CorruptFile(t *testing.T) {
 	// Create a temporary corrupt file
 	tmpDir := t.TempDir()
 	corruptPath := filepath.Join(tmpDir, "corrupt.model")
@@ -79,7 +79,7 @@ func TestNewSentencePieceTokenizer_CorruptFile(t *testing.T) {
 		t.Fatalf("failed to create corrupt test file: %v", err)
 	}
 
-	tok, err := NewSentencePieceTokenizer(corruptPath)
+	tok, err := NewSPMTokenizer(corruptPath)
 	if err == nil {
 		t.Error("expected error for corrupt model file")
 	}
@@ -88,10 +88,10 @@ func TestNewSentencePieceTokenizer_CorruptFile(t *testing.T) {
 	}
 }
 
-func TestSentencePieceTokenizer_Name(t *testing.T) {
+func TestSPMTokenizer_Name(t *testing.T) {
 	// This test doesn't need a real model - we test the method contract
 	// by verifying expected output
-	want := "sentencepiece"
+	want := "spm"
 
 	// Create with real model if available
 	path := filepath.Join("testdata", "test.model")
@@ -99,7 +99,7 @@ func TestSentencePieceTokenizer_Name(t *testing.T) {
 		t.Skip("test .model file not available, skipping")
 	}
 
-	tok, err := NewSentencePieceTokenizer(path)
+	tok, err := NewSPMTokenizer(path)
 	if err != nil {
 		t.Fatalf("failed to create tokenizer: %v", err)
 	}
@@ -109,13 +109,13 @@ func TestSentencePieceTokenizer_Name(t *testing.T) {
 	}
 }
 
-func TestSentencePieceTokenizer_DisplayName(t *testing.T) {
+func TestSPMTokenizer_DisplayName(t *testing.T) {
 	path := filepath.Join("testdata", "test.model")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Skip("test .model file not available, skipping")
 	}
 
-	tok, err := NewSentencePieceTokenizer(path)
+	tok, err := NewSPMTokenizer(path)
 	if err != nil {
 		t.Fatalf("failed to create tokenizer: %v", err)
 	}
@@ -126,26 +126,26 @@ func TestSentencePieceTokenizer_DisplayName(t *testing.T) {
 	}
 }
 
-func TestSentencePieceTokenizer_IsExact(t *testing.T) {
+func TestSPMTokenizer_IsExact(t *testing.T) {
 	path := filepath.Join("testdata", "test.model")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Skip("test .model file not available, skipping")
 	}
 
-	tok, err := NewSentencePieceTokenizer(path)
+	tok, err := NewSPMTokenizer(path)
 	if err != nil {
 		t.Fatalf("failed to create tokenizer: %v", err)
 	}
 
 	if !tok.IsExact() {
-		t.Error("SentencePieceTokenizer should return true for IsExact()")
+		t.Error("SPMTokenizerWrapper should return true for IsExact()")
 	}
 }
 
-func TestSentencePieceTokenizer_CountTokens(t *testing.T) {
+func TestSPMTokenizer_CountTokens(t *testing.T) {
 	modelPath := testModelPath(t)
 
-	tok, err := NewSentencePieceTokenizer(modelPath)
+	tok, err := NewSPMTokenizer(modelPath)
 	if err != nil {
 		t.Fatalf("failed to create tokenizer: %v", err)
 	}
@@ -196,13 +196,13 @@ func TestSentencePieceTokenizer_CountTokens(t *testing.T) {
 	}
 }
 
-func TestSentencePieceTokenizer_ImplementsInterface(t *testing.T) {
+func TestSPMTokenizer_ImplementsInterface(t *testing.T) {
 	path := filepath.Join("testdata", "test.model")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Skip("test .model file not available, skipping")
 	}
 
-	tok, err := NewSentencePieceTokenizer(path)
+	tok, err := NewSPMTokenizer(path)
 	if err != nil {
 		t.Fatalf("failed to create tokenizer: %v", err)
 	}

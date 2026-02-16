@@ -257,8 +257,8 @@ func (c *Counter) initializeTokenizers() {
 
 	// SentencePiece tokenizer (when vocab file is provided)
 	if c.vocabFile != "" {
-		if tokenizer, err := NewSentencePieceTokenizer(c.vocabFile); err == nil {
-			c.tokenizers["sentencepiece"] = tokenizer
+		if tokenizer, err := NewSPMTokenizer(c.vocabFile); err == nil {
+			c.tokenizers["spm"] = tokenizer
 		}
 	}
 }

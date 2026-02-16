@@ -12,8 +12,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Processor represents a SentencePiece processor (tokenizer).
-type Processor struct {
+// Tokenizer implements SentencePiece BPE tokenization.
+type Tokenizer struct {
 	mdl *spmmodel.ModelProto
 
 	pieces   map[string]int
@@ -26,18 +26,18 @@ type Processor struct {
 	maxPieceLength     int
 }
 
-// NewProcessorFromPath creates a new Processor from a .model file path.
-func NewProcessorFromPath(protoFile string) (*Processor, error) {
+// NewTokenizerFromPath creates a new Tokenizer from a .model file path.
+func NewTokenizerFromPath(protoFile string) (*Tokenizer, error) {
 	f, err := os.Open(protoFile)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read %q: %v", protoFile, err)
 	}
 	defer f.Close()
-	return NewProcessor(f)
+	return NewTokenizer(f)
 }
 
-// NewProcessor creates a new Processor from a reader with protobuf data.
-func NewProcessor(protoReader io.Reader) (*Processor, error) {
+// NewTokenizer creates a new Tokenizer from a reader with protobuf data.
+func NewTokenizer(protoReader io.Reader) (*Tokenizer, error) {
 	b, err := io.ReadAll(protoReader)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read protobuf data: %v", err)
@@ -110,7 +110,7 @@ func NewProcessor(protoReader io.Reader) (*Processor, error) {
 		}
 	}
 
-	return &Processor{
+	return &Tokenizer{
 		mdl:                &mp,
 		userDefinedMatcher: newPrefixMatcher(userDefined),
 		byte2Token:         byte2Token,
@@ -123,7 +123,7 @@ func NewProcessor(protoReader io.Reader) (*Processor, error) {
 }
 
 // Encode tokenizes the input text and returns a list of Tokens.
-func (proc *Processor) Encode(text string) []Token {
+func (tok *Tokenizer) Encode(text string) []Token {
 	text = normalize(text)
 
 	type symListElem struct {
@@ -134,7 +134,7 @@ func (proc *Processor) Encode(text string) []Token {
 	symList := make([]symListElem, 0, len(text))
 
 	for {
-		slen, found := proc.symbolMatch(text)
+		slen, found := tok.symbolMatch(text)
 		sym := symListElem{
 			noMerge: found,
 			symbol:  text[:slen],
@@ -167,7 +167,7 @@ func (proc *Processor) Encode(text string) []Token {
 		return -1
 	})
 
-	buf := make([]byte, proc.maxPieceLength)
+	buf := make([]byte, tok.maxPieceLength)
 	findMerged := func(x, y symListElem) (string, int, bool) {
 		combinedLen := len(x.symbol) + len(y.symbol)
 		if combinedLen > cap(buf) {
@@ -176,8 +176,8 @@ func (proc *Processor) Encode(text string) []Token {
 		buf = buf[:combinedLen]
 		copy(buf, x.symbol)
 		copy(buf[len(x.symbol):], y.symbol)
-		if id, found := proc.pieces[string(buf)]; found {
-			return proc.mdl.GetPieces()[id].GetPiece(), id, true
+		if id, found := tok.pieces[string(buf)]; found {
+			return tok.mdl.GetPieces()[id].GetPiece(), id, true
 		}
 		return "", 0, false
 	}
@@ -191,7 +191,7 @@ func (proc *Processor) Encode(text string) []Token {
 				left:   left,
 				right:  right,
 				length: len(mergedSymbol),
-				score:  proc.mdl.GetPieces()[id].GetScore(),
+				score:  tok.mdl.GetPieces()[id].GetScore(),
 			})
 		}
 	}
@@ -244,11 +244,11 @@ func (proc *Processor) Encode(text string) []Token {
 	tokens := make([]Token, 0, nTokens)
 	for i := 0; i >= 0; i = symList[i].next {
 		symbol := symList[i].symbol
-		id := proc.symbolToID(symbol)
+		id := tok.symbolToID(symbol)
 
-		if id == proc.unknownID && proc.mdl.GetTrainerSpec().GetByteFallback() {
+		if id == tok.unknownID && tok.mdl.GetTrainerSpec().GetByteFallback() {
 			for j := range len(symbol) {
-				tokens = append(tokens, proc.byte2Token[symbol[j]])
+				tokens = append(tokens, tok.byte2Token[symbol[j]])
 			}
 		} else {
 			tokens = append(tokens, Token{ID: id, Text: symbol})
@@ -258,8 +258,8 @@ func (proc *Processor) Encode(text string) []Token {
 	return tokens
 }
 
-func (proc *Processor) symbolMatch(text string) (int, bool) {
-	prefixLen := proc.userDefinedMatcher.findPrefixLen(text)
+func (tok *Tokenizer) symbolMatch(text string) (int, bool) {
+	prefixLen := tok.userDefinedMatcher.findPrefixLen(text)
 	if prefixLen > 0 {
 		return prefixLen, true
 	}
@@ -267,14 +267,14 @@ func (proc *Processor) symbolMatch(text string) (int, bool) {
 	return rlen, false
 }
 
-func (proc *Processor) symbolToID(symbol string) int {
-	if id, found := proc.reserved[symbol]; found {
+func (tok *Tokenizer) symbolToID(symbol string) int {
+	if id, found := tok.reserved[symbol]; found {
 		return id
 	}
-	if id, found := proc.pieces[symbol]; found {
+	if id, found := tok.pieces[symbol]; found {
 		return id
 	}
-	return proc.unknownID
+	return tok.unknownID
 }
 
 func convertHexValue(bv string) int {
@@ -288,12 +288,12 @@ func convertHexValue(bv string) int {
 }
 
 // Decode translates a list of token IDs back into the string they represent.
-func (proc *Processor) Decode(ids []int) string {
+func (tok *Tokenizer) Decode(ids []int) string {
 	var sb strings.Builder
 
 	for i := 0; i < len(ids); {
 		nextNonByte := i
-		for nextNonByte < len(ids) && proc.isByteID(ids[nextNonByte]) {
+		for nextNonByte < len(ids) && tok.isByteID(ids[nextNonByte]) {
 			nextNonByte++
 		}
 		numBytes := nextNonByte - i
@@ -301,7 +301,7 @@ func (proc *Processor) Decode(ids []int) string {
 		if numBytes > 0 {
 			buf := make([]byte, 0, numBytes)
 			for bi := i; bi < nextNonByte; bi++ {
-				buf = append(buf, proc.idToByte[ids[bi]])
+				buf = append(buf, tok.idToByte[ids[bi]])
 			}
 			for len(buf) > 0 {
 				r, size := utf8.DecodeRune(buf)
@@ -314,12 +314,12 @@ func (proc *Processor) Decode(ids []int) string {
 			break
 		}
 		id := ids[nextNonByte]
-		if proc.isControlID(id) {
+		if tok.isControlID(id) {
 			// Don't emit control IDs
-		} else if id == proc.unknownID {
-			sb.WriteString(proc.mdl.GetTrainerSpec().GetUnkSurface())
+		} else if id == tok.unknownID {
+			sb.WriteString(tok.mdl.GetTrainerSpec().GetUnkSurface())
 		} else {
-			piece := proc.mdl.GetPieces()[id].GetPiece()
+			piece := tok.mdl.GetPieces()[id].GetPiece()
 			sb.WriteString(replaceSeparatorsBySpace(piece))
 		}
 		i = nextNonByte + 1
@@ -329,18 +329,18 @@ func (proc *Processor) Decode(ids []int) string {
 }
 
 // DecodeTokens is a convenience wrapper around Decode.
-func (proc *Processor) DecodeTokens(tokens []Token) string {
+func (tok *Tokenizer) DecodeTokens(tokens []Token) string {
 	ids := make([]int, len(tokens))
 	for i, t := range tokens {
 		ids[i] = t.ID
 	}
-	return proc.Decode(ids)
+	return tok.Decode(ids)
 }
 
-func (proc *Processor) isByteID(id int) bool {
-	return proc.mdl.GetPieces()[id].GetType() == spmmodel.ModelProto_SentencePiece_BYTE
+func (tok *Tokenizer) isByteID(id int) bool {
+	return tok.mdl.GetPieces()[id].GetType() == spmmodel.ModelProto_SentencePiece_BYTE
 }
 
-func (proc *Processor) isControlID(id int) bool {
-	return proc.mdl.GetPieces()[id].GetType() == spmmodel.ModelProto_SentencePiece_CONTROL
+func (tok *Tokenizer) isControlID(id int) bool {
+	return tok.mdl.GetPieces()[id].GetType() == spmmodel.ModelProto_SentencePiece_CONTROL
 }

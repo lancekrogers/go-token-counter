@@ -132,18 +132,18 @@ func (c *ClaudeApproximator) IsExact() bool {
 	return false
 }
 
-// SentencePieceTokenizer uses a .model vocab file for exact tokenization.
+// SPMTokenizerWrapper uses a .model vocab file for exact tokenization.
 // Supports models like Llama 2, Mistral, and Gemma.
-type SentencePieceTokenizer struct {
-	processor *spm.Processor
+type SPMTokenizerWrapper struct {
+	tokenizer *spm.Tokenizer
 	modelPath string
 }
 
-// NewSentencePieceTokenizer creates a tokenizer from a SentencePiece .model file.
+// NewSPMTokenizer creates a tokenizer from a SentencePiece .model file.
 // Returns an error if the model file doesn't exist, is inaccessible, or cannot be loaded.
-func NewSentencePieceTokenizer(modelPath string) (*SentencePieceTokenizer, error) {
+func NewSPMTokenizer(modelPath string) (*SPMTokenizerWrapper, error) {
 	if modelPath == "" {
-		return nil, fmt.Errorf("model path is required for SentencePieceTokenizer")
+		return nil, fmt.Errorf("model path is required for SPMTokenizerWrapper")
 	}
 
 	if _, err := os.Stat(modelPath); err != nil {
@@ -153,34 +153,34 @@ func NewSentencePieceTokenizer(modelPath string) (*SentencePieceTokenizer, error
 		return nil, fmt.Errorf("failed to access vocab file: %w", err)
 	}
 
-	processor, err := spm.NewProcessorFromPath(modelPath)
+	tokenizer, err := spm.NewTokenizerFromPath(modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load SentencePiece model: %w", err)
 	}
 
-	return &SentencePieceTokenizer{
-		processor: processor,
+	return &SPMTokenizerWrapper{
+		tokenizer: tokenizer,
 		modelPath: modelPath,
 	}, nil
 }
 
 // CountTokens returns the token count using the SentencePiece model.
-func (t *SentencePieceTokenizer) CountTokens(text string) (int, error) {
-	tokens := t.processor.Encode(text)
+func (t *SPMTokenizerWrapper) CountTokens(text string) (int, error) {
+	tokens := t.tokenizer.Encode(text)
 	return len(tokens), nil
 }
 
 // Name returns the machine-readable tokenizer identifier.
-func (t *SentencePieceTokenizer) Name() string {
-	return "sentencepiece"
+func (t *SPMTokenizerWrapper) Name() string {
+	return "spm"
 }
 
 // DisplayName returns the human-readable tokenizer name.
-func (t *SentencePieceTokenizer) DisplayName() string {
+func (t *SPMTokenizerWrapper) DisplayName() string {
 	return "SentencePiece"
 }
 
 // IsExact returns true because SentencePiece provides exact token counts.
-func (t *SentencePieceTokenizer) IsExact() bool {
+func (t *SPMTokenizerWrapper) IsExact() bool {
 	return true
 }
