@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -106,31 +107,40 @@ func (c *Counter) Count(text string, model string, all bool) (*CountResult, erro
 	return result, nil
 }
 
-// countAllMethods counts tokens using all available methods.
+// countAllMethods counts tokens using all available encodings (deduplicated).
 func (c *Counter) countAllMethods(text string) []MethodResult {
 	methods := []MethodResult{}
+	seen := make(map[string]bool)
 
-	for model, tokenizer := range c.tokenizers {
-		meta := GetModelMetadata(model)
+	// Collect encoding keys sorted for deterministic output
+	keys := make([]string, 0, len(c.tokenizers))
+	for k := range c.tokenizers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, encoding := range keys {
+		tokenizer := c.tokenizers[encoding]
 
 		// Filter by provider if specified
 		if c.provider != "" && c.provider != "all" {
-			if meta != nil && string(meta.Provider) != c.provider {
+			if !encodingMatchesProvider(encoding, c.provider) {
 				continue
 			}
 		}
 
+		if seen[encoding] {
+			continue
+		}
+		seen[encoding] = true
+
 		if count, err := tokenizer.CountTokens(text); err == nil {
-			result := MethodResult{
+			methods = append(methods, MethodResult{
 				Name:        tokenizer.Name(),
 				DisplayName: tokenizer.DisplayName(),
 				Tokens:      count,
 				IsExact:     tokenizer.IsExact(),
-			}
-			if meta != nil {
-				result.ContextWindow = meta.ContextWindow
-			}
-			methods = append(methods, result)
+			})
 		}
 	}
 
@@ -139,10 +149,44 @@ func (c *Counter) countAllMethods(text string) []MethodResult {
 	return methods
 }
 
+// encodingMatchesProvider checks if an encoding should be included for a provider filter.
+func encodingMatchesProvider(encoding string, provider string) bool {
+	switch encoding {
+	case "o200k_base":
+		return provider == "openai"
+	case "cl100k_base":
+		// cl100k_base is used by openai legacy + open source models
+		return provider == "openai" || provider == "meta" || provider == "deepseek" || provider == "alibaba" || provider == "microsoft"
+	case "claude_approx":
+		return provider == "anthropic"
+	}
+	return false
+}
+
 // countSpecificModel counts tokens for a specific model.
 func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult, error) {
 	methods := []MethodResult{}
 
+	// Look up the model's encoding and find the right tokenizer
+	meta := GetModelMetadata(model)
+	if meta != nil {
+		if tokenizer, ok := c.tokenizers[meta.Encoding]; ok {
+			count, err := tokenizer.CountTokens(text)
+			if err != nil {
+				return nil, err
+			}
+			methods = append(methods, MethodResult{
+				Name:        fmt.Sprintf("tiktoken_%s", strings.ReplaceAll(model, "-", "_")),
+				DisplayName: fmt.Sprintf("%s (%s)", meta.Encoding, model),
+				Tokens:      count,
+				IsExact:     tokenizer.IsExact(),
+				ContextWindow: meta.ContextWindow,
+			})
+			return methods, nil
+		}
+	}
+
+	// Direct tokenizer lookup fallback (handles models registered directly)
 	if tokenizer, ok := c.tokenizers[model]; ok {
 		count, err := tokenizer.CountTokens(text)
 		if err != nil {
@@ -154,14 +198,15 @@ func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult,
 			Tokens:      count,
 			IsExact:     tokenizer.IsExact(),
 		}
-		if meta := GetModelMetadata(model); meta != nil {
+		if meta != nil {
 			result.ContextWindow = meta.ContextWindow
 		}
 		methods = append(methods, result)
-	} else {
-		methods = append(methods, c.getApproximations(text)...)
+		return methods, nil
 	}
 
+	// Fall back to approximations for unknown models
+	methods = append(methods, c.getApproximations(text)...)
 	return methods, nil
 }
 
@@ -195,135 +240,39 @@ func (c *Counter) getApproximations(text string) []MethodResult {
 	}
 }
 
-// initializeTokenizers sets up available tokenizers.
+// initializeTokenizers sets up one tokenizer per unique encoding.
 func (c *Counter) initializeTokenizers() {
-	// OpenAI Models - GPT-5 series (o200k_base)
-	if tokenizer, err := NewTiktokenTokenizer("gpt-5"); err == nil {
-		c.tokenizers["gpt-5"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("gpt-5-mini"); err == nil {
-		c.tokenizers["gpt-5-mini"] = tokenizer
+	if len(c.tokenizers) > 0 {
+		return
 	}
 
-	// OpenAI Models - GPT-4.1 series (o200k_base)
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4.1"); err == nil {
-		c.tokenizers["gpt-4.1"] = tokenizer
+	// One tokenizer per encoding, not one per model
+	if tokenizer, err := NewTiktokenByEncoding("o200k_base"); err == nil {
+		c.tokenizers["o200k_base"] = tokenizer
 	}
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4.1-mini"); err == nil {
-		c.tokenizers["gpt-4.1-mini"] = tokenizer
+	if tokenizer, err := NewTiktokenByEncoding("cl100k_base"); err == nil {
+		c.tokenizers["cl100k_base"] = tokenizer
 	}
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4.1-nano"); err == nil {
-		c.tokenizers["gpt-4.1-nano"] = tokenizer
-	}
-
-	// OpenAI Models - GPT-4o series (o200k_base)
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4o"); err == nil {
-		c.tokenizers["gpt-4o"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4o-mini"); err == nil {
-		c.tokenizers["gpt-4o-mini"] = tokenizer
-	}
-
-	// OpenAI Models - o-series (o200k_base)
-	if tokenizer, err := NewTiktokenTokenizer("o3"); err == nil {
-		c.tokenizers["o3"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("o3-mini"); err == nil {
-		c.tokenizers["o3-mini"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("o4-mini"); err == nil {
-		c.tokenizers["o4-mini"] = tokenizer
-	}
-
-	// OpenAI Models - Legacy (cl100k_base)
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4"); err == nil {
-		c.tokenizers["gpt-4"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("gpt-4-turbo"); err == nil {
-		c.tokenizers["gpt-4-turbo"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("gpt-3.5-turbo"); err == nil {
-		c.tokenizers["gpt-3.5-turbo"] = tokenizer
-	}
-
-	// Anthropic Models - Claude (approximation)
-	c.tokenizers["claude-4-opus"] = NewClaudeApproximator()
-	c.tokenizers["claude-4-sonnet"] = NewClaudeApproximator()
-	c.tokenizers["claude-4.5-sonnet"] = NewClaudeApproximator()
-	c.tokenizers["claude-3.7-sonnet"] = NewClaudeApproximator()
-	c.tokenizers["claude-3.5-sonnet"] = NewClaudeApproximator()
-	c.tokenizers["claude-3-opus"] = NewClaudeApproximator()
-	c.tokenizers["claude-3-sonnet"] = NewClaudeApproximator()
-	c.tokenizers["claude-3-haiku"] = NewClaudeApproximator()
-	// Keep legacy name for backward compatibility
-	c.tokenizers["claude-3"] = NewClaudeApproximator()
-
-	// Meta Models - Llama (tiktoken approximation)
-	if tokenizer, err := NewTiktokenTokenizer("llama-3.1-8b"); err == nil {
-		c.tokenizers["llama-3.1-8b"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("llama-3.1-70b"); err == nil {
-		c.tokenizers["llama-3.1-70b"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("llama-3.1-405b"); err == nil {
-		c.tokenizers["llama-3.1-405b"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("llama-4-scout"); err == nil {
-		c.tokenizers["llama-4-scout"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("llama-4-maverick"); err == nil {
-		c.tokenizers["llama-4-maverick"] = tokenizer
-	}
-
-	// DeepSeek Models
-	if tokenizer, err := NewTiktokenTokenizer("deepseek-v2"); err == nil {
-		c.tokenizers["deepseek-v2"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("deepseek-v3"); err == nil {
-		c.tokenizers["deepseek-v3"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("deepseek-coder-v2"); err == nil {
-		c.tokenizers["deepseek-coder-v2"] = tokenizer
-	}
-
-	// Alibaba Models - Qwen
-	if tokenizer, err := NewTiktokenTokenizer("qwen-2.5-7b"); err == nil {
-		c.tokenizers["qwen-2.5-7b"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("qwen-2.5-14b"); err == nil {
-		c.tokenizers["qwen-2.5-14b"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("qwen-2.5-72b"); err == nil {
-		c.tokenizers["qwen-2.5-72b"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("qwen-3-72b"); err == nil {
-		c.tokenizers["qwen-3-72b"] = tokenizer
-	}
-
-	// Microsoft Models - Phi
-	if tokenizer, err := NewTiktokenTokenizer("phi-3-mini"); err == nil {
-		c.tokenizers["phi-3-mini"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("phi-3-small"); err == nil {
-		c.tokenizers["phi-3-small"] = tokenizer
-	}
-	if tokenizer, err := NewTiktokenTokenizer("phi-3-medium"); err == nil {
-		c.tokenizers["phi-3-medium"] = tokenizer
-	}
+	c.tokenizers["claude_approx"] = NewClaudeApproximator()
 
 	// SentencePiece tokenizer (when vocab file is provided)
 	if c.vocabFile != "" {
 		if tokenizer, err := NewSentencePieceTokenizer(c.vocabFile); err == nil {
-			// Register for all models that use SentencePiece
-			spModels := []string{
-				"llama-3.1-8b", "llama-3.1-70b", "llama-3.1-405b",
-				"llama-4-scout", "llama-4-maverick",
-			}
-			for _, model := range spModels {
-				c.tokenizers[model] = tokenizer
-			}
+			c.tokenizers["sentencepiece"] = tokenizer
 		}
 	}
+}
+
+// ModelsByEncoding returns a map of encoding name to sorted model names.
+func ModelsByEncoding() map[string][]string {
+	result := make(map[string][]string)
+	for name, meta := range modelRegistry {
+		result[meta.Encoding] = append(result[meta.Encoding], name)
+	}
+	for enc := range result {
+		sort.Strings(result[enc])
+	}
+	return result
 }
 
 // countWords counts words in text.

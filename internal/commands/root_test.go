@@ -114,26 +114,22 @@ func TestRequiresSentencePiece(t *testing.T) {
 	}
 }
 
-func TestFormatContextWindow(t *testing.T) {
+func TestCorner(t *testing.T) {
 	tests := []struct {
-		size     int
+		joint    string
+		width    int
 		expected string
 	}{
-		{128_000, "128K"},
-		{200_000, "200K"},
-		{8_000, "8K"},
-		{16_000, "16K"},
-		{32_768, "33K"},
-		{1_000_000, "1M"},
-		{2_000_000, "2M"},
-		{500, "500"},
+		{"┌", 10, "┌──────────"},
+		{"┼", 5, "┼─────"},
+		{"└", 1, "└─"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			result := formatContextWindow(tt.size)
+		t.Run(tt.joint, func(t *testing.T) {
+			result := corner(tt.joint, tt.width)
 			if result != tt.expected {
-				t.Errorf("formatContextWindow(%d) = %q, want %q", tt.size, result, tt.expected)
+				t.Errorf("corner(%q, %d) = %q, want %q", tt.joint, tt.width, result, tt.expected)
 			}
 		})
 	}
@@ -172,7 +168,7 @@ func TestNewRootCmd(t *testing.T) {
 	}
 
 	// Verify flags exist
-	flags := []string{"model", "vocab-file", "provider", "all", "json", "cost", "recursive", "no-color", "verbose"}
+	flags := []string{"model", "vocab-file", "provider", "all", "json", "cost", "models", "recursive", "no-color", "verbose"}
 	for _, flag := range flags {
 		if cmd.Flags().Lookup(flag) == nil && cmd.PersistentFlags().Lookup(flag) == nil {
 			t.Errorf("Flag --%s not found", flag)

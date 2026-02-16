@@ -80,15 +80,18 @@ func CalculateCosts(methods []MethodResult) []CostEstimate {
 }
 
 // getTokenCount finds the best token count to use for cost calculation.
+// Prefers exact tiktoken counts, then falls back to approximations.
 func getTokenCount(methods []MethodResult) int {
+	// Prefer exact tokenizer counts (o200k_base or cl100k_base)
 	for _, method := range methods {
-		if method.IsExact && strings.Contains(strings.ToLower(method.Name), "gpt") {
+		if method.IsExact {
 			return method.Tokens
 		}
 	}
 
+	// Fall back to character-based approximation
 	for _, method := range methods {
-		if strings.Contains(method.Name, "Character-based") {
+		if strings.Contains(method.Name, "character_based") {
 			return method.Tokens
 		}
 	}

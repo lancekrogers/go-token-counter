@@ -27,6 +27,7 @@ type countOptions struct {
 	all           bool
 	jsonOutput    bool
 	showCost      bool
+	showModels    bool
 	recursive     bool
 	charsPerToken float64
 	wordsPerToken float64
@@ -66,7 +67,7 @@ When counting a directory with --recursive, the command:
   tcount --all --cost doc.md                               # Show all methods with costs
   tcount --json doc.md                                     # Output as JSON
   tcount -r ./src                                          # Count all files in directory
-  tcount -r --json ./project                               # Directory with JSON output`,
+  tcount -r --models ./project                             # Show encoding→model lookup`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCount(cmd.Context(), args[0], opts)
@@ -103,6 +104,7 @@ Download vocab files from HuggingFace (see error messages for URLs)`)
 	cmd.Flags().BoolVar(&opts.all, "all", false, "show all counting methods")
 	cmd.Flags().BoolVar(&opts.jsonOutput, "json", false, "output in JSON format")
 	cmd.Flags().BoolVar(&opts.showCost, "cost", false, "include cost estimates")
+	cmd.Flags().BoolVarP(&opts.showModels, "models", "m", false, "show encoding-to-model lookup table")
 	cmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "recursively count tokens in directory")
 	cmd.Flags().BoolVarP(&opts.recursive, "directory", "d", false, "alias for --recursive")
 	cmd.Flags().Float64Var(&opts.charsPerToken, "chars-per-token", 4.0, "characters per token ratio")
@@ -264,18 +266,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 		return outputJSON(result)
 	}
 
-	return outputTable(display, result)
-}
-
-// formatContextWindow formats context window size for display.
-func formatContextWindow(size int) string {
-	if size >= 1_000_000 {
-		return fmt.Sprintf("%.0fM", float64(size)/1_000_000.0)
-	}
-	if size >= 1000 {
-		return fmt.Sprintf("%.0fK", float64(size)/1000.0)
-	}
-	return fmt.Sprintf("%d", size)
+	return outputTable(display, result, opts.showModels)
 }
 
 func outputJSON(result *tokens.CountResult) error {
@@ -284,13 +275,13 @@ func outputJSON(result *tokens.CountResult) error {
 	return encoder.Encode(result)
 }
 
-func outputTable(display *ui.UI, result *tokens.CountResult) error {
+func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) error {
 	if result.IsDirectory {
 		display.Info("Token Count Report for: %s (directory)", result.FilePath)
 	} else {
 		display.Info("Token Count Report for: %s", result.FilePath)
 	}
-	display.Info("%s", strings.Repeat("═", 55))
+	display.Info("%s", strings.Repeat("=", 55))
 	fmt.Println()
 
 	display.Info("Basic Statistics:")
@@ -302,10 +293,43 @@ func outputTable(display *ui.UI, result *tokens.CountResult) error {
 	display.Info("  Lines:          %d", result.Lines)
 	fmt.Println()
 
+	// Calculate dynamic column widths
+	methodWidth := len("Method")
+	tokenWidth := len("Tokens")
+	accuracyWidth := len("Accuracy")
+
+	for _, method := range result.Methods {
+		if len(method.DisplayName) > methodWidth {
+			methodWidth = len(method.DisplayName)
+		}
+		tokenStr := fmt.Sprintf("%d", method.Tokens)
+		if len(tokenStr) > tokenWidth {
+			tokenWidth = len(tokenStr)
+		}
+	}
+
+	// Add padding
+	methodWidth += 2
+	tokenWidth += 2
+	if accuracyWidth < 11 {
+		accuracyWidth = 11
+	}
+
 	display.Info("Token Counts by Method:")
-	display.Info("  ┌─────────────────────────┬──────────┬────────────┬──────────────────┐")
-	display.Info("  │ Method                  │ Tokens   │ Accuracy   │ Context Usage    │")
-	display.Info("  ├─────────────────────────┼──────────┼────────────┼──────────────────┤")
+	display.Info("  %s%s%s%s",
+		corner("┌", methodWidth),
+		corner("┬", tokenWidth),
+		corner("┬", accuracyWidth),
+		"┐")
+	display.Info("  │ %-*s │ %-*s │ %-*s │",
+		methodWidth-2, "Method",
+		tokenWidth-2, "Tokens",
+		accuracyWidth-2, "Accuracy")
+	display.Info("  %s%s%s%s",
+		corner("├", methodWidth),
+		corner("┼", tokenWidth),
+		corner("┼", accuracyWidth),
+		"┤")
 
 	for _, method := range result.Methods {
 		accuracy := "Approx"
@@ -315,17 +339,17 @@ func outputTable(display *ui.UI, result *tokens.CountResult) error {
 			accuracy = "Estimated"
 		}
 
-		contextStr := ""
-		if method.ContextWindow > 0 {
-			pct := float64(method.Tokens) / float64(method.ContextWindow) * 100.0
-			contextStr = fmt.Sprintf("%.1f%% of %s", pct, formatContextWindow(method.ContextWindow))
-		}
-
-		display.Info("  │ %-23s │ %-8d │ %-10s │ %-16s │",
-			method.DisplayName, method.Tokens, accuracy, contextStr)
+		display.Info("  │ %-*s │ %-*d │ %-*s │",
+			methodWidth-2, method.DisplayName,
+			tokenWidth-2, method.Tokens,
+			accuracyWidth-2, accuracy)
 	}
 
-	display.Info("  └─────────────────────────┴──────────┴────────────┴──────────────────┘")
+	display.Info("  %s%s%s%s",
+		corner("└", methodWidth),
+		corner("┴", tokenWidth),
+		corner("┴", accuracyWidth),
+		"┘")
 
 	if len(result.Costs) > 0 {
 		fmt.Println()
@@ -337,5 +361,32 @@ func outputTable(display *ui.UI, result *tokens.CountResult) error {
 		}
 	}
 
+	if showModels {
+		fmt.Println()
+		outputModelLookup(display)
+	}
+
 	return nil
+}
+
+// corner builds a box-drawing segment: joint + repeated "─" + "─" padding.
+func corner(joint string, width int) string {
+	return joint + strings.Repeat("─", width)
+}
+
+// outputModelLookup prints the encoding→model mapping.
+func outputModelLookup(display *ui.UI) {
+	display.Info("Model Lookup:")
+
+	byEncoding := tokens.ModelsByEncoding()
+
+	// Deterministic order
+	order := []string{"o200k_base", "cl100k_base", "claude_approx"}
+	for _, enc := range order {
+		models, ok := byEncoding[enc]
+		if !ok {
+			continue
+		}
+		display.Info("  %-14s %s", enc+":", strings.Join(models, ", "))
+	}
 }

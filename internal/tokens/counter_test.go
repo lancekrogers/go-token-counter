@@ -80,8 +80,12 @@ func TestCounter_Count(t *testing.T) {
 		t.Errorf("Lines = %d, want 1", result.Lines)
 	}
 
-	if len(result.Methods) < 3 {
-		t.Errorf("Expected at least 3 counting methods, got %d", len(result.Methods))
+	// 3 encodings (o200k, cl100k, claude) + 3 approximations = 6
+	if len(result.Methods) != 6 {
+		t.Errorf("Expected 6 counting methods, got %d", len(result.Methods))
+		for _, m := range result.Methods {
+			t.Logf("  %s (%s)", m.DisplayName, m.Name)
+		}
 	}
 
 	hasCharBased := false
@@ -158,64 +162,33 @@ func TestInitializeTokenizers(t *testing.T) {
 	counter := NewCounter(CounterOptions{})
 	counter.initializeTokenizers()
 
-	expectedModels := []string{
-		// OpenAI - GPT-5 series
-		"gpt-5",
-		"gpt-5-mini",
-		// OpenAI - GPT-4.1 series
-		"gpt-4.1",
-		"gpt-4.1-mini",
-		"gpt-4.1-nano",
-		// OpenAI - GPT-4o series
-		"gpt-4o",
-		"gpt-4o-mini",
-		// OpenAI - o-series
-		"o3",
-		"o3-mini",
-		"o4-mini",
-		// OpenAI - Legacy
-		"gpt-4",
-		"gpt-4-turbo",
-		"gpt-3.5-turbo",
-		// Anthropic - Claude
-		"claude-4-opus",
-		"claude-4-sonnet",
-		"claude-4.5-sonnet",
-		"claude-3.7-sonnet",
-		"claude-3.5-sonnet",
-		"claude-3-opus",
-		"claude-3-sonnet",
-		"claude-3-haiku",
-		"claude-3", // legacy
-		// Meta - Llama
-		"llama-3.1-8b",
-		"llama-3.1-70b",
-		"llama-3.1-405b",
-		"llama-4-scout",
-		"llama-4-maverick",
-		// DeepSeek
-		"deepseek-v2",
-		"deepseek-v3",
-		"deepseek-coder-v2",
-		// Alibaba - Qwen
-		"qwen-2.5-7b",
-		"qwen-2.5-14b",
-		"qwen-2.5-72b",
-		"qwen-3-72b",
-		// Microsoft - Phi
-		"phi-3-mini",
-		"phi-3-small",
-		"phi-3-medium",
+	// Now we have 3 encodings: o200k_base, cl100k_base, claude_approx
+	expectedEncodings := []string{
+		"o200k_base",
+		"cl100k_base",
+		"claude_approx",
 	}
 
-	for _, model := range expectedModels {
-		if _, ok := counter.tokenizers[model]; !ok {
-			t.Errorf("Model %q not registered in initializeTokenizers()", model)
+	for _, enc := range expectedEncodings {
+		if _, ok := counter.tokenizers[enc]; !ok {
+			t.Errorf("Encoding %q not registered in initializeTokenizers()", enc)
 		}
 	}
 
-	if len(counter.tokenizers) != len(expectedModels) {
-		t.Errorf("Expected %d tokenizers, got %d", len(expectedModels), len(counter.tokenizers))
+	if len(counter.tokenizers) != len(expectedEncodings) {
+		t.Errorf("Expected %d tokenizers, got %d", len(expectedEncodings), len(counter.tokenizers))
+	}
+}
+
+func TestInitializeTokenizers_Idempotent(t *testing.T) {
+	counter := NewCounter(CounterOptions{})
+	counter.initializeTokenizers()
+	count1 := len(counter.tokenizers)
+	counter.initializeTokenizers()
+	count2 := len(counter.tokenizers)
+
+	if count1 != count2 {
+		t.Errorf("initializeTokenizers not idempotent: first=%d, second=%d", count1, count2)
 	}
 }
 
@@ -233,12 +206,35 @@ func TestCounter_CountSpecificModel(t *testing.T) {
 		t.Errorf("Expected 1 method for specific model, got %d", len(result.Methods))
 	}
 
-	if result.Methods[0].IsExact != true {
+	if !result.Methods[0].IsExact {
 		t.Error("GPT-5 tokenizer should be exact")
 	}
 
 	if result.Methods[0].ContextWindow == 0 {
 		t.Error("Expected context window to be populated for gpt-5")
+	}
+}
+
+func TestCounter_CountSpecificModel_Claude(t *testing.T) {
+	text := "The quick brown fox jumps over the lazy dog."
+
+	counter := NewCounter(CounterOptions{})
+
+	result, err := counter.Count(text, "claude-4-sonnet", false)
+	if err != nil {
+		t.Fatalf("Count with claude model failed: %v", err)
+	}
+
+	if len(result.Methods) != 1 {
+		t.Errorf("Expected 1 method for specific model, got %d", len(result.Methods))
+	}
+
+	if result.Methods[0].IsExact {
+		t.Error("Claude approximator should not be exact")
+	}
+
+	if result.Methods[0].ContextWindow == 0 {
+		t.Error("Expected context window to be populated for claude-4-sonnet")
 	}
 }
 
@@ -276,14 +272,40 @@ func TestCounter_ProviderFilter(t *testing.T) {
 			strings.Contains(name, "whitespace") {
 			continue
 		}
-		// Non-OpenAI models should not be in the results
-		if strings.Contains(name, "claude") || strings.Contains(name, "llama") {
+		// Claude should not be in the results for openai filter
+		if strings.Contains(name, "claude") {
 			t.Errorf("Provider filter 'openai' should exclude %s", method.Name)
 		}
 	}
 }
 
-func TestCounter_ContextWindowPopulated(t *testing.T) {
+func TestCounter_ProviderFilter_Anthropic(t *testing.T) {
+	text := "The quick brown fox jumps over the lazy dog."
+
+	counter := NewCounter(CounterOptions{Provider: "anthropic"})
+
+	result, err := counter.Count(text, "", true)
+	if err != nil {
+		t.Fatalf("Count with provider filter failed: %v", err)
+	}
+
+	hasClaudeMethod := false
+	for _, method := range result.Methods {
+		if strings.Contains(method.Name, "claude") {
+			hasClaudeMethod = true
+		}
+		// tiktoken encodings should not appear for anthropic filter
+		if strings.Contains(method.Name, "tiktoken") {
+			t.Errorf("Provider filter 'anthropic' should exclude %s", method.Name)
+		}
+	}
+
+	if !hasClaudeMethod {
+		t.Error("Provider filter 'anthropic' should include claude_3_approx")
+	}
+}
+
+func TestCounter_NoDuplicates(t *testing.T) {
 	text := "The quick brown fox jumps over the lazy dog."
 
 	counter := NewCounter(CounterOptions{})
@@ -293,16 +315,74 @@ func TestCounter_ContextWindowPopulated(t *testing.T) {
 		t.Fatalf("Count failed: %v", err)
 	}
 
-	hasContextWindow := false
+	seen := make(map[string]bool)
 	for _, method := range result.Methods {
-		if method.ContextWindow > 0 {
-			hasContextWindow = true
-			break
+		if seen[method.Name] {
+			t.Errorf("Duplicate method name: %s", method.Name)
 		}
+		seen[method.Name] = true
 	}
 
-	if !hasContextWindow {
-		t.Error("Expected at least one method to have a context window populated")
+	// Exactly 6 methods: o200k, cl100k, claude, char, word, whitespace
+	if len(result.Methods) != 6 {
+		t.Errorf("Expected exactly 6 methods, got %d", len(result.Methods))
+		for _, m := range result.Methods {
+			t.Logf("  %s (%s)", m.DisplayName, m.Name)
+		}
+	}
+}
+
+func TestModelsByEncoding(t *testing.T) {
+	byEnc := ModelsByEncoding()
+
+	if len(byEnc) == 0 {
+		t.Fatal("ModelsByEncoding() returned empty map")
+	}
+
+	// Check expected encodings exist
+	for _, enc := range []string{"o200k_base", "cl100k_base", "claude_approx"} {
+		models, ok := byEnc[enc]
+		if !ok {
+			t.Errorf("Missing encoding %q", enc)
+			continue
+		}
+		if len(models) == 0 {
+			t.Errorf("No models for encoding %q", enc)
+		}
+		// Verify sorted
+		for i := 1; i < len(models); i++ {
+			if models[i] < models[i-1] {
+				t.Errorf("Models for %q not sorted: %v", enc, models)
+				break
+			}
+		}
+	}
+}
+
+func TestEncodingMatchesProvider(t *testing.T) {
+	tests := []struct {
+		encoding string
+		provider string
+		want     bool
+	}{
+		{"o200k_base", "openai", true},
+		{"o200k_base", "anthropic", false},
+		{"cl100k_base", "openai", true},
+		{"cl100k_base", "meta", true},
+		{"cl100k_base", "anthropic", false},
+		{"claude_approx", "anthropic", true},
+		{"claude_approx", "openai", false},
+		{"unknown", "openai", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.encoding+"_"+tt.provider, func(t *testing.T) {
+			got := encodingMatchesProvider(tt.encoding, tt.provider)
+			if got != tt.want {
+				t.Errorf("encodingMatchesProvider(%q, %q) = %v, want %v",
+					tt.encoding, tt.provider, got, tt.want)
+			}
+		})
 	}
 }
 

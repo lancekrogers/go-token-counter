@@ -14,27 +14,28 @@ import (
 	"github.com/lancekrogers/go-token-counter/internal/errors"
 )
 
-// TiktokenTokenizer implements exact tokenization for OpenAI models.
+// TiktokenTokenizer implements exact tokenization using a tiktoken encoding.
 type TiktokenTokenizer struct {
-	model    string
-	encoding *tiktoken.Tiktoken
+	encodingName string
+	encoding     *tiktoken.Tiktoken
 }
 
-// NewTiktokenTokenizer creates a new tiktoken-based tokenizer.
+// NewTiktokenTokenizer creates a new tiktoken-based tokenizer for a specific model.
 func NewTiktokenTokenizer(model string) (*TiktokenTokenizer, error) {
 	encodingName := getEncodingForModel(model)
+	return NewTiktokenByEncoding(encodingName)
+}
 
+// NewTiktokenByEncoding creates a tokenizer directly from an encoding name.
+func NewTiktokenByEncoding(encodingName string) (*TiktokenTokenizer, error) {
 	encoding, err := tiktoken.GetEncoding(encodingName)
 	if err != nil {
-		encoding, err = tiktoken.EncodingForModel(model)
-		if err != nil {
-			return nil, errors.Wrap(err, "getting encoding for model").WithField("model", model)
-		}
+		return nil, errors.Wrap(err, "getting encoding").WithField("encoding", encodingName)
 	}
 
 	return &TiktokenTokenizer{
-		model:    model,
-		encoding: encoding,
+		encodingName: encodingName,
+		encoding:     encoding,
 	}, nil
 }
 
@@ -46,26 +47,12 @@ func (t *TiktokenTokenizer) CountTokens(text string) (int, error) {
 
 // Name returns the machine-readable tokenizer identifier.
 func (t *TiktokenTokenizer) Name() string {
-	modelName := strings.ReplaceAll(t.model, "-", "_")
-	modelName = strings.ReplaceAll(modelName, ".", "_")
-	return fmt.Sprintf("tiktoken_%s", modelName)
+	return fmt.Sprintf("tiktoken_%s", t.encodingName)
 }
 
 // DisplayName returns the human-readable tokenizer name.
 func (t *TiktokenTokenizer) DisplayName() string {
-	if meta := GetModelMetadata(t.model); meta != nil {
-		switch meta.Provider {
-		case ProviderMeta:
-			return fmt.Sprintf("Llama (%s)", t.model)
-		case ProviderDeepSeek:
-			return fmt.Sprintf("DeepSeek (%s)", t.model)
-		case ProviderAlibaba:
-			return fmt.Sprintf("Qwen (%s)", t.model)
-		case ProviderMicrosoft:
-			return fmt.Sprintf("Phi (%s)", t.model)
-		}
-	}
-	return fmt.Sprintf("GPT (%s)", t.model)
+	return t.encodingName
 }
 
 // IsExact returns true for tiktoken tokenizers.

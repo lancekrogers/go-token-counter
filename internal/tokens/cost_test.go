@@ -90,7 +90,7 @@ func TestGetTokenCount(t *testing.T) {
 		{
 			name: "Falls back to character-based",
 			methods: []MethodResult{
-				{Name: "Character-based (÷4.0)", DisplayName: "Character-based (÷4.0)", Tokens: 100, IsExact: false},
+				{Name: "character_based_div4", DisplayName: "Character-based (÷4.0)", Tokens: 100, IsExact: false},
 				{Name: "word_based", Tokens: 90, IsExact: false},
 			},
 			expected: 100,
