@@ -15,17 +15,29 @@ A fast, zero-network token counter for LLM workflows. Count tokens in files and 
 
 ## Install
 
+### Homebrew (macOS & Linux)
+
+```bash
+brew install lancekrogers/tap/tcount
+```
+
+### Go
+
 ```bash
 go install github.com/lancekrogers/go-token-counter/cmd/tcount@latest
 ```
 
-Or build from source:
+### From source
 
 ```bash
 git clone https://github.com/lancekrogers/go-token-counter.git
 cd go-token-counter
 go build -o bin/tcount ./cmd/tcount
 ```
+
+### Binary releases
+
+Pre-built binaries for macOS, Linux, and Windows are available on the [releases page](https://github.com/lancekrogers/go-token-counter/releases).
 
 ## Quick Start
 
