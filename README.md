@@ -1,84 +1,30 @@
 # tcount
 
-A fast, multi-method token counter for LLM workflows. Count tokens in files and directories using exact OpenAI tokenizers, Claude approximations, SentencePiece vocabularies, and generic estimation methods — all from a single command.
+A fast, zero-network token counter for LLM workflows. Count tokens in files and directories using exact OpenAI tokenizers, Claude approximations, SentencePiece vocabularies, and generic estimation — all from a single CLI.
 
-## Why tcount?
+## Features
 
-When working with LLMs, you constantly need to know how many tokens your content uses. Different models tokenize differently, and existing tools only support one method at a time. `tcount` gives you every count at once:
+- **Exact BPE tokenization** — offline, no network calls. Supports GPT-5, GPT-4.1, GPT-4o, o-series, and legacy GPT-4/3.5.
+- **Claude approximation** calibrated for Anthropic models
+- **SentencePiece** exact tokenization for Llama and other open-source models (bring your own `.model` file)
+- **Context window usage** — see what percentage of a model's context you're consuming
+- **Cost estimates** with per-1M-token pricing via `--cost`
+- **Provider filtering** — compare models from a specific provider
+- **Directory scanning** with `.gitignore` support and binary file detection
+- **JSON output** for scripting and pipelines
 
-- **Exact counts** via tiktoken (GPT-5, GPT-4.1, GPT-4o, o-series, and legacy GPT-4/3.5)
-- **Claude estimates** calibrated for Anthropic models (Claude 4, 3.7, 3.5, 3)
-- **SentencePiece tokenization** for Llama and other open-source models
-- **Context window usage** showing what percentage of a model's context you're consuming
-- **Cost estimates** with 2026 per-1M token pricing
-- **Provider filtering** to compare models from a specific provider
-- **Directory scanning** with .gitignore support and binary file detection
-
-## Supported Models
-
-### OpenAI
-| Model | Encoding | Context Window |
-|-------|----------|----------------|
-| `gpt-5`, `gpt-5-mini` | o200k_base | 200K |
-| `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | o200k_base | 128K |
-| `gpt-4o`, `gpt-4o-mini` | o200k_base | 128K |
-| `o3`, `o3-mini`, `o4-mini` | o200k_base | 200K |
-| `gpt-4`, `gpt-4-turbo` (legacy) | cl100k_base | 8K/128K |
-| `gpt-3.5-turbo` (legacy) | cl100k_base | 16K |
-
-### Anthropic
-| Model | Method | Context Window |
-|-------|--------|----------------|
-| `claude-4-opus`, `claude-4-sonnet` | Approximation | 200K |
-| `claude-4.5-sonnet` | Approximation | 200K |
-| `claude-3.7-sonnet`, `claude-3.5-sonnet` | Approximation | 200K |
-| `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` | Approximation | 200K |
-
-### Meta (Llama)
-| Model | Method | Context Window |
-|-------|--------|----------------|
-| `llama-4-scout`, `llama-4-maverick` | tiktoken approx / SentencePiece | 128K |
-| `llama-3.1-8b`, `llama-3.1-70b`, `llama-3.1-405b` | tiktoken approx / SentencePiece | 128K |
-
-### DeepSeek
-| Model | Method | Context Window |
-|-------|--------|----------------|
-| `deepseek-v2`, `deepseek-v3`, `deepseek-coder-v2` | tiktoken approx | 128K |
-
-### Alibaba (Qwen)
-| Model | Method | Context Window |
-|-------|--------|----------------|
-| `qwen-2.5-7b`, `qwen-2.5-14b`, `qwen-2.5-72b` | tiktoken approx | 33K |
-| `qwen-3-72b` | tiktoken approx | 33K |
-
-### Microsoft (Phi)
-| Model | Method | Context Window |
-|-------|--------|----------------|
-| `phi-3-mini`, `phi-3-small`, `phi-3-medium` | tiktoken approx | 128K |
-
-## Installation
-
-### From source
-
-Requires Go 1.21+
+## Install
 
 ```bash
 go install github.com/lancekrogers/go-token-counter/cmd/tcount@latest
 ```
 
-### Build from repo
+Or build from source:
 
 ```bash
 git clone https://github.com/lancekrogers/go-token-counter.git
 cd go-token-counter
 go build -o bin/tcount ./cmd/tcount
-```
-
-Or with [just](https://github.com/casey/just):
-
-```bash
-just build
-just install    # installs to $GOPATH/bin
 ```
 
 ## Quick Start
@@ -87,10 +33,10 @@ just install    # installs to $GOPATH/bin
 # Count tokens in a file
 tcount myfile.txt
 
-# Use a specific model
+# Specific model
 tcount --model gpt-5 prompt.md
 
-# Show all methods with costs
+# All methods with cost estimates
 tcount --all --cost prompt.md
 
 # Filter by provider
@@ -103,6 +49,61 @@ tcount -r ./src
 tcount --json document.md
 ```
 
+## Supported Models
+
+### OpenAI
+| Model | Encoding | Context |
+|-------|----------|---------|
+| `gpt-5`, `gpt-5-mini` | o200k_base | 200K |
+| `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | o200k_base | 128K |
+| `gpt-4o`, `gpt-4o-mini` | o200k_base | 128K |
+| `o3`, `o3-mini`, `o4-mini` | o200k_base | 200K |
+| `gpt-4`, `gpt-4-turbo` | cl100k_base | 8K–128K |
+| `gpt-3.5-turbo` | cl100k_base | 16K |
+
+### Anthropic
+| Model | Method | Context |
+|-------|--------|---------|
+| `claude-4-opus`, `claude-4-sonnet` | Approximation | 200K |
+| `claude-4.5-sonnet` | Approximation | 200K |
+| `claude-3.7-sonnet`, `claude-3.5-sonnet` | Approximation | 200K |
+| `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` | Approximation | 200K |
+
+### Meta (Llama)
+| Model | Method | Context |
+|-------|--------|---------|
+| `llama-4-scout`, `llama-4-maverick` | tiktoken approx / SentencePiece | 128K |
+| `llama-3.1-8b`, `llama-3.1-70b`, `llama-3.1-405b` | tiktoken approx / SentencePiece | 128K |
+
+### DeepSeek
+| Model | Method | Context |
+|-------|--------|---------|
+| `deepseek-v2`, `deepseek-v3`, `deepseek-coder-v2` | tiktoken approx | 128K |
+
+### Alibaba (Qwen)
+| Model | Method | Context |
+|-------|--------|---------|
+| `qwen-2.5-7b`, `qwen-2.5-14b`, `qwen-2.5-72b` | tiktoken approx | 33K |
+| `qwen-3-72b` | tiktoken approx | 33K |
+
+### Microsoft (Phi)
+| Model | Method | Context |
+|-------|--------|---------|
+| `phi-3-mini`, `phi-3-small`, `phi-3-medium` | tiktoken approx | 128K |
+
+## Tokenization Methods
+
+| Method | Accuracy | When Used |
+|--------|----------|-----------|
+| tiktoken (o200k_base) | Exact | GPT-5, GPT-4.1, GPT-4o, o3, o4-mini |
+| tiktoken (cl100k_base) | Exact | GPT-4, GPT-3.5 |
+| Claude approximation | Estimated | All Claude models (÷3.8 char ratio) |
+| SentencePiece | Exact | Llama with `--vocab-file` |
+| tiktoken approximation | Approximate | Llama, DeepSeek, Qwen, Phi (no vocab file) |
+| Character-based | Approximate | Any (chars ÷ configurable ratio, default 4.0) |
+| Word-based | Approximate | Any (words × configurable multiplier, default 1.33) |
+| Whitespace split | Approximate | Any (raw word count as lower bound) |
+
 ## Usage
 
 ```
@@ -113,11 +114,11 @@ tcount [file|directory] [flags]
 
 | Flag | Short | Description |
 |------|-------|-------------|
-| `--model` | | Specific model tokenizer (see supported models above) |
-| `--provider` | | Filter by provider: `openai`, `anthropic`, `meta`, `deepseek`, `alibaba`, `microsoft`, `all` (default) |
+| `--model` | | Specific model tokenizer |
+| `--provider` | | Filter by provider: `openai`, `anthropic`, `meta`, `deepseek`, `alibaba`, `microsoft`, `all` |
 | `--vocab-file` | | Path to SentencePiece `.model` file for exact Llama tokenization |
 | `--all` | | Show all counting methods |
-| `--json` | | Output as JSON |
+| `--json` | | JSON output |
 | `--cost` | | Include cost estimates (per 1M tokens) |
 | `--recursive` | `-r` | Recursively count files in a directory |
 | `--directory` | `-d` | Alias for `--recursive` |
@@ -128,7 +129,7 @@ tcount [file|directory] [flags]
 
 ## Examples
 
-### Single file with context window display
+### Single model
 
 ```
 $ tcount --model gpt-5 document.md
@@ -149,7 +150,7 @@ Token Counts by Method:
   └─────────────────────────┴──────────┴────────────┴──────────────────┘
 ```
 
-### All methods with cost estimates
+### All methods with costs
 
 ```
 $ tcount --all --cost document.md
@@ -182,34 +183,18 @@ Cost Estimates (Input):
   claude-4-sonnet: $0.0043 ($3.00/1M tokens)
 ```
 
-### Provider filtering
+### SentencePiece for exact Llama tokenization
 
 ```bash
-# Show only OpenAI models
-tcount --provider openai document.md
-
-# Show only Anthropic models
-tcount --provider anthropic document.md
-
-# Show only Meta/Llama models
-tcount --provider meta document.md
-```
-
-### SentencePiece vocabulary for Llama
-
-For exact Llama tokenization, download the tokenizer model and use `--vocab-file`:
-
-```bash
-# Download from HuggingFace (requires authentication):
-# Llama 3.1: https://huggingface.co/meta-llama/Llama-3.1-8B/blob/main/original/tokenizer.model
-# Llama 4:   https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E/blob/main/tokenizer.model
+# Download tokenizer.model from HuggingFace (requires auth):
+# https://huggingface.co/meta-llama/Llama-3.1-8B/blob/main/original/tokenizer.model
 
 tcount --model llama-3.1-8b --vocab-file /path/to/tokenizer.model document.md
 ```
 
-Without `--vocab-file`, Llama models use a tiktoken-based approximation. With it, you get exact SentencePiece tokenization.
+Without `--vocab-file`, Llama models use a tiktoken-based approximation.
 
-### Recursive directory scan
+### Directory scanning
 
 ```
 $ tcount -r --verbose internal/tokens/
@@ -236,6 +221,8 @@ Token Counts by Method:
   └─────────────────────────┴──────────┴────────────┴──────────────────┘
 ```
 
+When scanning directories, tcount respects `.gitignore` rules, skips binary files and `.git` directories, and aggregates all text files into a combined count. Use `--verbose` to see file and skip statistics.
+
 ### JSON output
 
 ```
@@ -258,79 +245,27 @@ $ tcount --json --model gpt-5 document.md
 }
 ```
 
-JSON output is designed for piping into other tools:
-
 ```bash
-# Get just the GPT-5 token count
+# Extract a specific count
 tcount --json myfile.txt | jq '.methods[] | select(.name == "tiktoken_gpt_5") | .tokens'
 
 # Batch count all markdown files
 for f in docs/*.md; do tcount --json "$f"; done | jq -s '.'
 ```
 
-## Tokenization Methods
-
-| Method | Accuracy | Models |
-|--------|----------|--------|
-| tiktoken (o200k_base) | Exact | GPT-5, GPT-4.1, GPT-4o, o3, o4-mini |
-| tiktoken (cl100k_base) | Exact | GPT-4, GPT-3.5 (legacy) |
-| Claude approximation | Estimated | All Claude models (÷3.8 character ratio) |
-| SentencePiece | Exact | Llama (with `--vocab-file`) |
-| tiktoken approximation | Approximate | Llama, DeepSeek, Qwen, Phi (without vocab file) |
-| Character-based | Approximate | Any (characters ÷ configurable ratio, default 4.0) |
-| Word-based | Approximate | Any (words × configurable multiplier, default ×1.33) |
-| Whitespace split | Approximate | Any (raw word count as lower bound) |
-
-## Pricing
-
-Cost estimates use 2026 per-1M token rates from official provider pricing pages.
-
-| Model | Input/1M | Output/1M |
-|-------|----------|-----------|
-| GPT-5 | $1.25 | $10.00 |
-| GPT-5-mini | $0.25 | $2.00 |
-| GPT-4.1 | $2.00 | $8.00 |
-| GPT-4o | $2.50 | $10.00 |
-| Claude 4.5 Sonnet | $3.00 | $15.00 |
-| Claude 4 Opus | $15.00 | $75.00 |
-| Claude 4 Sonnet | $3.00 | $15.00 |
-
-Use `--cost` to see estimates for your content. Default display shows GPT-5, GPT-4o, Claude 4.5 Sonnet, and Claude 4 Sonnet.
-
-*Pricing last updated: 2026-02-13*
-
-## Directory Scanning
-
-When using `-r`/`--recursive`, tcount:
-
-- Respects `.gitignore` rules in the target directory
-- Skips binary files (detected by extension and null-byte check)
-- Skips `.git` directories
-- Aggregates all text file contents for a combined count
-- Reports file counts and skip statistics with `--verbose`
-
 ## Development
 
 Requires [just](https://github.com/casey/just) for the build system.
 
 ```bash
-just              # List all recipes
-just build        # Build (with fmt + vet)
-just build-only   # Build only
-just fmt          # Format code
-just vet          # Run go vet
-just lint         # Run golangci-lint
-
-just testing unit          # Run tests
-just testing coverage      # Coverage report
-just testing coverage-html # HTML coverage report
-just testing bench         # Benchmarks
-
-just cross linux       # Build for Linux amd64
-just cross darwin      # Build for macOS amd64
-just cross darwin-arm64 # Build for macOS arm64
-just cross windows     # Build for Windows amd64
-just cross all         # Build all platforms
+just                       # List all recipes
+just build                 # Build (with fmt + vet)
+just test all              # Run all tests
+just test unit             # Unit tests only
+just test integration      # Integration tests only
+just test coverage         # Coverage report
+just test bench            # Benchmarks
+just cross all             # Cross-compile for all platforms
 ```
 
 ## License
