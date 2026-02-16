@@ -8,6 +8,7 @@ bin_dir := "bin"
 BUILDTOOL := "go run ./internal/buildutil"
 
 # Show available recipes
+[private]
 @default:
     just --list
 
