@@ -1,6 +1,4 @@
 // Package bpe implements Byte Pair Encoding tokenization.
-// Inlined from github.com/pkoukk/tiktoken-go to eliminate runtime network
-// dependency and reduce the external dependency surface.
 package bpe
 
 import (

@@ -20,7 +20,7 @@ func loadEmbeddedVocab(name string) (map[string]int, error) {
 	return parseBPERanks(data)
 }
 
-// parseBPERanks parses tiktoken-format BPE data into a rank map.
+// parseBPERanks parses base64-encoded BPE rank data into a rank map.
 func parseBPERanks(data []byte) (map[string]int, error) {
 	ranks := make(map[string]int)
 	for _, line := range strings.Split(string(data), "\n") {
