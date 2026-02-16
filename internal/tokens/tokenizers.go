@@ -7,7 +7,7 @@ import (
 
 	"github.com/lancekrogers/go-token-counter/internal/bpe"
 	"github.com/lancekrogers/go-token-counter/internal/errors"
-	"github.com/lancekrogers/go-token-counter/internal/sentencepiece"
+	"github.com/lancekrogers/go-token-counter/internal/spm"
 )
 
 // TiktokenTokenizer implements exact tokenization using a tiktoken encoding.
@@ -135,7 +135,7 @@ func (c *ClaudeApproximator) IsExact() bool {
 // SentencePieceTokenizer uses a .model vocab file for exact tokenization.
 // Supports models like Llama 2, Mistral, and Gemma.
 type SentencePieceTokenizer struct {
-	processor *sentencepiece.Processor
+	processor *spm.Processor
 	modelPath string
 }
 
@@ -153,7 +153,7 @@ func NewSentencePieceTokenizer(modelPath string) (*SentencePieceTokenizer, error
 		return nil, fmt.Errorf("failed to access vocab file: %w", err)
 	}
 
-	processor, err := sentencepiece.NewProcessorFromPath(modelPath)
+	processor, err := spm.NewProcessorFromPath(modelPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load SentencePiece model: %w", err)
 	}

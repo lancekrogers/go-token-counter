@@ -1,4 +1,4 @@
-package sentencepiece
+package spm
 
 import (
 	"fmt"
@@ -8,13 +8,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/lancekrogers/go-token-counter/internal/sentencepiece/model"
+	"github.com/lancekrogers/go-token-counter/internal/spm/spmmodel"
 	"google.golang.org/protobuf/proto"
 )
 
 // Processor represents a SentencePiece processor (tokenizer).
 type Processor struct {
-	mdl *model.ModelProto
+	mdl *spmmodel.ModelProto
 
 	pieces   map[string]int
 	reserved map[string]int
@@ -43,14 +43,14 @@ func NewProcessor(protoReader io.Reader) (*Processor, error) {
 		return nil, fmt.Errorf("unable to read protobuf data: %v", err)
 	}
 
-	var mp model.ModelProto
+	var mp spmmodel.ModelProto
 	err = proto.Unmarshal(b, &mp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to unmarshal protobuf: %v", err)
 	}
 
 	tspec := mp.GetTrainerSpec()
-	if tspec.GetModelType() != model.TrainerSpec_BPE {
+	if tspec.GetModelType() != spmmodel.TrainerSpec_BPE {
 		return nil, fmt.Errorf("model type %s not supported", tspec.GetModelType())
 	}
 
@@ -68,9 +68,9 @@ func NewProcessor(protoReader io.Reader) (*Processor, error) {
 	maxPieceLength := 0
 
 	for i, piece := range mp.GetPieces() {
-		isNormalPiece := (piece.GetType() == model.ModelProto_SentencePiece_NORMAL ||
-			piece.GetType() == model.ModelProto_SentencePiece_USER_DEFINED ||
-			piece.GetType() == model.ModelProto_SentencePiece_UNUSED)
+		isNormalPiece := (piece.GetType() == spmmodel.ModelProto_SentencePiece_NORMAL ||
+			piece.GetType() == spmmodel.ModelProto_SentencePiece_USER_DEFINED ||
+			piece.GetType() == spmmodel.ModelProto_SentencePiece_UNUSED)
 
 		if isNormalPiece {
 			pieces[piece.GetPiece()] = i
@@ -79,14 +79,14 @@ func NewProcessor(protoReader io.Reader) (*Processor, error) {
 			reserved[piece.GetPiece()] = i
 		}
 
-		if piece.GetType() == model.ModelProto_SentencePiece_USER_DEFINED {
+		if piece.GetType() == spmmodel.ModelProto_SentencePiece_USER_DEFINED {
 			userDefined[piece.GetPiece()] = true
-		} else if piece.GetType() == model.ModelProto_SentencePiece_UNKNOWN {
+		} else if piece.GetType() == spmmodel.ModelProto_SentencePiece_UNKNOWN {
 			if unkID > 0 {
 				return nil, fmt.Errorf("unk redefined")
 			}
 			unkID = i
-		} else if piece.GetType() == model.ModelProto_SentencePiece_BYTE {
+		} else if piece.GetType() == spmmodel.ModelProto_SentencePiece_BYTE {
 			if !tspec.GetByteFallback() {
 				return nil, fmt.Errorf("byte piece %q found but byte_fallback=false", piece.GetPiece())
 			}
@@ -338,9 +338,9 @@ func (proc *Processor) DecodeTokens(tokens []Token) string {
 }
 
 func (proc *Processor) isByteID(id int) bool {
-	return proc.mdl.GetPieces()[id].GetType() == model.ModelProto_SentencePiece_BYTE
+	return proc.mdl.GetPieces()[id].GetType() == spmmodel.ModelProto_SentencePiece_BYTE
 }
 
 func (proc *Processor) isControlID(id int) bool {
-	return proc.mdl.GetPieces()[id].GetType() == model.ModelProto_SentencePiece_CONTROL
+	return proc.mdl.GetPieces()[id].GetType() == spmmodel.ModelProto_SentencePiece_CONTROL
 }

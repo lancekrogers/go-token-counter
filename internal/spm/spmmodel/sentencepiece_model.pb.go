@@ -18,7 +18,7 @@
 // 	protoc        v3.14.0
 // source: sentencepiece_model.proto
 
-package model
+package spmmodel
 
 import (
 	reflect "reflect"

@@ -1,4 +1,4 @@
-package sentencepiece
+package spm
 
 import "strings"
 

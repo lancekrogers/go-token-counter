@@ -1,4 +1,4 @@
-package sentencepiece
+package spm
 
 // priorityQueue is a generic priority queue backed by a binary heap.
 type priorityQueue[T any] struct {

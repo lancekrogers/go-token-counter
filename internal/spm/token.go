@@ -1,7 +1,5 @@
-// Package sentencepiece implements SentencePiece BPE tokenization.
-// Inlined from github.com/eliben/go-sentencepiece to reduce external
-// dependency surface.
-package sentencepiece
+// Package spm implements SentencePiece BPE tokenization from .model files.
+package spm
 
 import "fmt"
 
