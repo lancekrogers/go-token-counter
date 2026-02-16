@@ -5,18 +5,19 @@ mod test '.justfiles/test.just'
 
 binary := "tcount"
 bin_dir := "bin"
+BUILDTOOL := "go run ./internal/buildutil"
 
 # Show available recipes
 @default:
     just --list
 
-# Build the binary
-build: fmt vet
-    go build -o {{bin_dir}}/{{binary}} ./cmd/tcount
+# Build the binary (with dashboard)
+build:
+    @{{BUILDTOOL}} build
 
-# Build only (no fmt/vet)
+# Build only (no vet, with dashboard)
 build-only:
-    go build -o {{bin_dir}}/{{binary}} ./cmd/tcount
+    @{{BUILDTOOL}} build-only
 
 # Format code
 fmt:
@@ -30,9 +31,9 @@ vet:
 lint:
     golangci-lint run ./...
 
-# Clean build artifacts
+# Clean build artifacts (with dashboard)
 clean:
-    rm -rf {{bin_dir}}
+    @{{BUILDTOOL}} clean
 
 # Download dependencies
 deps:
