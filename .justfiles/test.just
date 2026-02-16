@@ -3,20 +3,21 @@ set working-directory := '..'
 BUILDTOOL := "go run ./internal/buildutil"
 
 # Show available test recipes
+[private]
 @default:
-    just --list --justfile {{source_file()}}
+    just --list --justfile {{ source_file() }}
 
 # Run all tests (unit + integration, with dashboard)
 all:
-    @{{BUILDTOOL}} all
+    @{{ BUILDTOOL }} all
 
 # Run unit tests (with dashboard)
 unit:
-    @{{BUILDTOOL}} test
+    @{{ BUILDTOOL }} test
 
 # Run integration tests (with dashboard)
 integration:
-    @{{BUILDTOOL}} integration
+    @{{ BUILDTOOL }} integration
 
 # Run tests with coverage
 coverage:
