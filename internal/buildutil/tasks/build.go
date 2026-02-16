@@ -11,6 +11,18 @@ import (
 	"github.com/lancekrogers/go-token-counter/internal/buildutil/ui"
 )
 
+// ldflags returns linker flags that inject version from git describe.
+func ldflags() string {
+	cmd := exec.Command("git", "describe", "--tags", "--always", "--dirty")
+	out, err := cmd.Output()
+	version := "dev"
+	if err == nil {
+		version = strings.TrimSpace(string(out))
+		version = strings.TrimPrefix(version, "v")
+	}
+	return fmt.Sprintf("-s -w -X main.version=%s", version)
+}
+
 // PackageResult tracks build results for a package
 type PackageResult struct {
 	Package   string
@@ -77,7 +89,7 @@ func Build(verbose bool) error {
 	// Create bin directory
 	os.MkdirAll("bin", 0o755)
 
-	cmd := exec.Command("go", "build", "-o", "bin/tcount", "./cmd/tcount")
+	cmd := exec.Command("go", "build", "-ldflags", ldflags(), "-o", "bin/tcount", "./cmd/tcount")
 	if verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -232,7 +244,7 @@ func BuildOnly(verbose bool) error {
 	ui.Task("Building", "tcount binary")
 
 	// Build main binary only
-	cmd := exec.Command("go", "build", "-o", "bin/tcount", "./cmd/tcount")
+	cmd := exec.Command("go", "build", "-ldflags", ldflags(), "-o", "bin/tcount", "./cmd/tcount")
 	if verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

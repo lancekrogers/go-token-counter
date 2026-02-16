@@ -19,11 +19,13 @@ builds:
         goarch: arm64
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: "tcount_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
 checksum:
   name_template: checksums.txt
