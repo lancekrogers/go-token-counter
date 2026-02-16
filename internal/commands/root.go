@@ -286,11 +286,11 @@ func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) er
 
 	display.Info("Basic Statistics:")
 	if result.IsDirectory {
-		display.Info("  Files:          %d", result.FileCount)
+		display.Info("  Files:          %s", formatInt(result.FileCount))
 	}
-	display.Info("  Characters:     %d", result.Characters)
-	display.Info("  Words:          %d", result.Words)
-	display.Info("  Lines:          %d", result.Lines)
+	display.Info("  Characters:     %s", formatInt(result.Characters))
+	display.Info("  Words:          %s", formatInt(result.Words))
+	display.Info("  Lines:          %s", formatInt(result.Lines))
 	fmt.Println()
 
 	// Calculate dynamic column widths
@@ -302,7 +302,7 @@ func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) er
 		if len(method.DisplayName) > methodWidth {
 			methodWidth = len(method.DisplayName)
 		}
-		tokenStr := fmt.Sprintf("%d", method.Tokens)
+		tokenStr := formatInt(method.Tokens)
 		if len(tokenStr) > tokenWidth {
 			tokenWidth = len(tokenStr)
 		}
@@ -339,9 +339,9 @@ func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) er
 			accuracy = "Estimated"
 		}
 
-		display.Info("  │ %-*s │ %-*d │ %-*s │",
+		display.Info("  │ %-*s │ %-*s │ %-*s │",
 			methodWidth-2, method.DisplayName,
-			tokenWidth-2, method.Tokens,
+			tokenWidth-2, formatInt(method.Tokens),
 			accuracyWidth-2, accuracy)
 	}
 
@@ -372,6 +372,29 @@ func outputTable(display *ui.UI, result *tokens.CountResult, showModels bool) er
 // corner builds a box-drawing segment: joint + repeated "─" + "─" padding.
 func corner(joint string, width int) string {
 	return joint + strings.Repeat("─", width)
+}
+
+// formatInt formats an integer with comma thousand separators.
+func formatInt(n int) string {
+	if n < 0 {
+		return "-" + formatInt(-n)
+	}
+	s := fmt.Sprintf("%d", n)
+	if len(s) <= 3 {
+		return s
+	}
+	var b strings.Builder
+	remainder := len(s) % 3
+	if remainder > 0 {
+		b.WriteString(s[:remainder])
+	}
+	for i := remainder; i < len(s); i += 3 {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(s[i : i+3])
+	}
+	return b.String()
 }
 
 // outputModelLookup prints the encoding→model mapping.
