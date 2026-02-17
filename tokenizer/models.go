@@ -6,13 +6,13 @@ import "sort"
 type Provider string
 
 const (
-	ProviderOpenAI    Provider = "openai"
-	ProviderAnthropic Provider = "anthropic"
-	ProviderMeta      Provider = "meta"
-	ProviderDeepSeek  Provider = "deepseek"
-	ProviderAlibaba   Provider = "alibaba"
-	ProviderMicrosoft Provider = "microsoft"
-	ProviderGoogle    Provider = "google"
+	ProviderOpenAI    Provider = "openai"    // OpenAI (GPT, o-series)
+	ProviderAnthropic Provider = "anthropic" // Anthropic (Claude)
+	ProviderMeta      Provider = "meta"      // Meta (Llama)
+	ProviderDeepSeek  Provider = "deepseek"  // DeepSeek
+	ProviderAlibaba   Provider = "alibaba"   // Alibaba (Qwen)
+	ProviderMicrosoft Provider = "microsoft" // Microsoft (Phi)
+	ProviderGoogle    Provider = "google"    // Google (Gemma)
 )
 
 // ModelMetadata contains comprehensive information about an LLM model.

@@ -36,14 +36,17 @@ type BPETokenizerWrapper struct {
 	tokenizer    *bpe.BPETokenizer
 }
 
-// NewBPETokenizer creates a new BPE-based tokenizer for a specific model.
-func NewBPETokenizer(model string) (*BPETokenizerWrapper, error) {
+// NewBPETokenizer creates an exact tokenizer for the given model name.
+// Supports OpenAI models (gpt-4o, gpt-5, o3, o4-mini, etc.) and
+// open-source models that use BPE-compatible encodings.
+func NewBPETokenizer(model string) (Tokenizer, error) {
 	encodingName := getEncodingForModel(model)
 	return NewBPETokenizerByEncoding(encodingName)
 }
 
-// NewBPETokenizerByEncoding creates a tokenizer directly from an encoding name.
-func NewBPETokenizerByEncoding(encodingName string) (*BPETokenizerWrapper, error) {
+// NewBPETokenizerByEncoding creates a tokenizer for a specific BPE encoding.
+// Supported encodings: o200k_base, cl100k_base, p50k_base, r50k_base.
+func NewBPETokenizerByEncoding(encodingName string) (Tokenizer, error) {
 	tokenizer, err := bpe.NewEncoderByName(encodingName)
 	if err != nil {
 		return nil, fmt.Errorf("getting encoding %q: %w", encodingName, err)
@@ -114,8 +117,9 @@ func getEncodingForModel(model string) string {
 // ClaudeApproximator provides approximation for Claude models.
 type ClaudeApproximator struct{}
 
-// NewClaudeApproximator creates a new Claude approximator.
-func NewClaudeApproximator() *ClaudeApproximator {
+// NewClaudeApproximator creates a character-based approximator tuned for
+// Claude models. Uses a 3.8 characters per token ratio.
+func NewClaudeApproximator() Tokenizer {
 	return &ClaudeApproximator{}
 }
 
@@ -147,8 +151,9 @@ type SPMTokenizerWrapper struct {
 	modelPath string
 }
 
-// NewSPMTokenizer creates a tokenizer from a SentencePiece .model file.
-func NewSPMTokenizer(modelPath string) (*SPMTokenizerWrapper, error) {
+// NewSPMTokenizer creates a SentencePiece tokenizer from a .model vocab file.
+// Supports Llama, Mistral, Gemma, and other SPM-based models.
+func NewSPMTokenizer(modelPath string) (Tokenizer, error) {
 	if modelPath == "" {
 		return nil, fmt.Errorf("model path is required for SPMTokenizerWrapper")
 	}
