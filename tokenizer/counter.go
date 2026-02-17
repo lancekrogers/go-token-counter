@@ -1,10 +1,14 @@
 package tokenizer
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/lancekrogers/go-token-counter/tokenizer/fileops"
 )
 
 // Counter handles token counting.
@@ -54,6 +58,86 @@ func (c *Counter) Count(text string, model string, all bool) (*CountResult, erro
 		}
 		result.Methods = methods
 	}
+
+	return result, nil
+}
+
+// CountFile counts tokens in a single file.
+// It checks for context cancellation, rejects binary files, reads the file
+// content, and delegates to Count. The result includes FilePath and FileSize.
+func (c *Counter) CountFile(ctx context.Context, path string, model string, all bool) (*CountResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	isBinary, err := fileops.IsBinaryFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("checking if file is binary %q: %w", path, err)
+	}
+	if isBinary {
+		return nil, fmt.Errorf("file %q: %w", path, ErrBinaryFile)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading file %q: %w", path, err)
+	}
+
+	result, err := c.Count(string(content), model, all)
+	if err != nil {
+		return nil, err
+	}
+
+	result.FilePath = path
+	result.FileSize = len(content)
+
+	return result, nil
+}
+
+// CountDirectory counts tokens across all text files in a directory.
+// It walks the directory respecting .gitignore rules and skipping binary files,
+// aggregates all file contents, and counts tokens on the combined text.
+// Context cancellation is checked between each major operation.
+func (c *Counter) CountDirectory(ctx context.Context, path string, model string, all bool) (*CountResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	walkResult, err := fileops.WalkDirectory(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("walking directory %q: %w", path, err)
+	}
+
+	if len(walkResult.Files) == 0 {
+		return nil, fmt.Errorf("no text files found in directory %q", path)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	content, err := fileops.AggregateFileContents(ctx, walkResult.Files)
+	if err != nil {
+		return nil, fmt.Errorf("reading files in %q: %w", path, err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	result, err := c.Count(string(content), model, all)
+	if err != nil {
+		return nil, err
+	}
+
+	result.FilePath = path
+	result.FileSize = len(content)
+	result.IsDirectory = true
+	result.FileCount = len(walkResult.Files)
 
 	return result, nil
 }
