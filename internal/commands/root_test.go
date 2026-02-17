@@ -2,6 +2,8 @@ package commands
 
 import (
 	"testing"
+
+	"github.com/lancekrogers/go-token-counter/tokenizer"
 )
 
 func TestIsValidModel(t *testing.T) {
@@ -114,10 +116,10 @@ func TestRequiresSentencePiece(t *testing.T) {
 	}
 }
 
-func TestValidModels(t *testing.T) {
-	models := validModels()
+func TestListModelsContainsKeyModels(t *testing.T) {
+	models := tokenizer.ListModels()
 	if len(models) == 0 {
-		t.Fatal("validModels() returned empty list")
+		t.Fatal("tokenizer.ListModels() returned empty list")
 	}
 
 	// Check key models are present
@@ -131,7 +133,7 @@ func TestValidModels(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("Required model %q not in validModels()", model)
+			t.Errorf("Required model %q not in tokenizer.ListModels()", model)
 		}
 	}
 }

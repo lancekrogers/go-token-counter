@@ -8,8 +8,13 @@ import (
 )
 
 func ExampleNewCounter() {
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
-	result, err := counter.Count("Hello, world!", "gpt-4o", false)
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	ctx := context.Background()
+	result, err := counter.Count(ctx, "Hello, world!", "gpt-4o", false)
 	if err != nil {
 		fmt.Println("error:", err)
 		return
@@ -23,8 +28,13 @@ func ExampleNewCounter() {
 }
 
 func ExampleCounter_Count() {
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
-	result, err := counter.Count("The quick brown fox jumps over the lazy dog.", "", true)
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	ctx := context.Background()
+	result, err := counter.Count(ctx, "The quick brown fox jumps over the lazy dog.", "", true)
 	if err != nil {
 		fmt.Println("error:", err)
 		return
@@ -39,9 +49,13 @@ func ExampleCounter_Count() {
 }
 
 func ExampleCounter_CountFile() {
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
 	ctx := context.Background()
-	_, err := counter.CountFile(ctx, "nonexistent.txt", "gpt-4o", false)
+	_, err = counter.CountFile(ctx, "nonexistent.txt", "gpt-4o", false)
 	if err != nil {
 		fmt.Println("File not found (expected)")
 	}
@@ -82,10 +96,20 @@ func ExampleGetModelMetadata() {
 }
 
 func ExampleCalculateCosts() {
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
-	result, _ := counter.Count("Hello, world!", "gpt-4o", false)
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	ctx := context.Background()
+	result, _ := counter.Count(ctx, "Hello, world!", "gpt-4o", false)
 	costs := tokenizer.CalculateCosts(result.Methods)
 	for _, c := range costs {
 		fmt.Printf("%s: $%.6f\n", c.Model, c.Cost)
 	}
+	// Output:
+	// gpt-5: $0.000020
+	// gpt-4o: $0.000010
+	// claude-4-sonnet: $0.000012
+	// claude-4.5-sonnet: $0.000012
 }

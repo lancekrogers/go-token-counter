@@ -1,6 +1,7 @@
 package integration_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -20,11 +21,15 @@ func TestIntegrationTokenizer_O200kBase(t *testing.T) {
 		{"unicode", readFixture(t, "unicode.txt"), 18},
 	}
 
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		t.Fatalf("NewCounter() error: %v", err)
+	}
+	ctx := context.Background()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := counter.Count(tc.text, "gpt-4o", false)
+			result, err := counter.Count(ctx, tc.text, "gpt-4o", false)
 			if err != nil {
 				t.Fatalf("Count() error: %v", err)
 			}
@@ -57,11 +62,15 @@ func TestIntegrationTokenizer_Cl100kBase(t *testing.T) {
 		{"unicode", readFixture(t, "unicode.txt"), 24},
 	}
 
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		t.Fatalf("NewCounter() error: %v", err)
+	}
+	ctx := context.Background()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := counter.Count(tc.text, "gpt-4", false)
+			result, err := counter.Count(ctx, tc.text, "gpt-4", false)
 			if err != nil {
 				t.Fatalf("Count() error: %v", err)
 			}
@@ -83,9 +92,13 @@ func TestIntegrationTokenizer_Cl100kBase(t *testing.T) {
 
 func TestIntegrationTokenizer_AllMethods(t *testing.T) {
 	text := readFixture(t, "sample.txt")
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		t.Fatalf("NewCounter() error: %v", err)
+	}
+	ctx := context.Background()
 
-	result, err := counter.Count(text, "", true)
+	result, err := counter.Count(ctx, text, "", true)
 	if err != nil {
 		t.Fatalf("Count() error: %v", err)
 	}
@@ -103,9 +116,13 @@ func TestIntegrationTokenizer_AllMethods(t *testing.T) {
 
 func TestIntegrationTokenizer_Approximations(t *testing.T) {
 	text := readFixture(t, "sample.txt")
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		t.Fatalf("NewCounter() error: %v", err)
+	}
+	ctx := context.Background()
 
-	result, err := counter.Count(text, "", true)
+	result, err := counter.Count(ctx, text, "", true)
 	if err != nil {
 		t.Fatalf("Count() error: %v", err)
 	}

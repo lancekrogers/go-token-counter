@@ -37,16 +37,17 @@ func GetModelMetadata(modelName string) *ModelMetadata {
 	return nil
 }
 
-// ListModels returns all registered model names.
+// ListModels returns all registered model names in sorted order.
 func ListModels() []string {
 	models := make([]string, 0, len(modelRegistry))
 	for name := range modelRegistry {
 		models = append(models, name)
 	}
+	sort.Strings(models)
 	return models
 }
 
-// ListModelsByProvider returns all models from a specific provider.
+// ListModelsByProvider returns all models from a specific provider, sorted by name.
 func ListModelsByProvider(provider Provider) []ModelMetadata {
 	models := make([]ModelMetadata, 0)
 	for _, meta := range modelRegistry {
@@ -54,6 +55,9 @@ func ListModelsByProvider(provider Provider) []ModelMetadata {
 			models = append(models, meta)
 		}
 	}
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].Name < models[j].Name
+	})
 	return models
 }
 

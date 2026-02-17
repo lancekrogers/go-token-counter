@@ -122,30 +122,12 @@ Download vocab files from HuggingFace (see error messages for URLs)`)
 	return cmd
 }
 
-// validModels returns the list of valid model names.
-func validModels() []string {
-	return []string{
-		"gpt-5", "gpt-5-mini",
-		"gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-		"gpt-4o", "gpt-4o-mini",
-		"o3", "o3-mini", "o4-mini",
-		"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
-		"claude-4-opus", "claude-4-sonnet", "claude-4.5-sonnet",
-		"claude-3.7-sonnet", "claude-3.5-sonnet",
-		"claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3",
-		"llama-3.1-8b", "llama-3.1-70b", "llama-3.1-405b", "llama-4-scout", "llama-4-maverick",
-		"deepseek-v2", "deepseek-v3", "deepseek-coder-v2",
-		"qwen-2.5-7b", "qwen-2.5-14b", "qwen-2.5-72b", "qwen-3-72b",
-		"phi-3-mini", "phi-3-small", "phi-3-medium",
-	}
-}
-
-// isValidModel checks if a model name is valid.
+// isValidModel checks if a model name is valid using the tokenizer registry.
 func isValidModel(model string) bool {
 	if model == "" {
 		return true
 	}
-	for _, valid := range validModels() {
+	for _, valid := range tokenizer.ListModels() {
 		if model == valid {
 			return true
 		}
@@ -248,14 +230,17 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 		)
 	}
 
-	counter := tokenizer.NewCounter(tokenizer.CounterOptions{
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{
 		CharsPerToken: opts.charsPerToken,
 		WordsPerToken: opts.wordsPerToken,
 		VocabFile:     opts.vocabFile,
-		Provider:      opts.provider,
+		Provider:      tokenizer.Provider(opts.provider),
 	})
+	if err != nil {
+		return errors.Wrap(err, "creating token counter")
+	}
 
-	result, err := counter.Count(string(content), opts.model, opts.all)
+	result, err := counter.Count(ctx, string(content), opts.model, opts.all)
 	if err != nil {
 		return errors.Wrap(err, "counting tokens")
 	}

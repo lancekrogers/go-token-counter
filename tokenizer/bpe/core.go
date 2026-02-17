@@ -26,7 +26,7 @@ type Encoder struct {
 func NewEncoder(encoder map[string]int, specialTokensEncoder map[string]int, pattern string) (*Encoder, error) {
 	regex, err := regexp2.Compile(pattern, regexp2.None)
 	if err != nil {
-		return nil, fmt.Errorf("error compiling regex: %s", err)
+		return nil, fmt.Errorf("compiling BPE split regex: %w", err)
 	}
 
 	specialRegexStrs := make([]string, 0, len(specialTokensEncoder))
@@ -35,7 +35,7 @@ func NewEncoder(encoder map[string]int, specialTokensEncoder map[string]int, pat
 	}
 	specialRegex, err := regexp2.Compile(strings.Join(specialRegexStrs, "|"), regexp2.None)
 	if err != nil {
-		return nil, fmt.Errorf("error compiling special regex: %s", err)
+		return nil, fmt.Errorf("compiling special token regex: %w", err)
 	}
 
 	decoder := make(map[int]string, len(encoder))

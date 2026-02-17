@@ -60,7 +60,10 @@ func NewBPETokenizerByEncoding(encodingName string) (Tokenizer, error) {
 
 // CountTokens counts tokens using BPE tokenization.
 func (t *BPETokenizerWrapper) CountTokens(text string) (int, error) {
-	tokens := t.tokenizer.Encode(text, nil, nil)
+	tokens, err := t.tokenizer.Encode(text, nil, nil)
+	if err != nil {
+		return 0, fmt.Errorf("encoding text: %w", err)
+	}
 	return len(tokens), nil
 }
 
@@ -114,6 +117,10 @@ func getEncodingForModel(model string) string {
 	return "o200k_base"
 }
 
+// claudeCharsPerToken is the approximate character-to-token ratio for Claude models.
+// Based on Anthropic's documentation of ~3.8 characters per token for English text.
+const claudeCharsPerToken = 3.8
+
 // ClaudeApproximator provides approximation for Claude models.
 type ClaudeApproximator struct{}
 
@@ -125,8 +132,7 @@ func NewClaudeApproximator() Tokenizer {
 
 // CountTokens approximates token count for Claude.
 func (c *ClaudeApproximator) CountTokens(text string) (int, error) {
-	chars := len(text)
-	tokens := int(float64(chars) / 3.8)
+	tokens := int(float64(len(text)) / claudeCharsPerToken)
 	return tokens, nil
 }
 
@@ -155,7 +161,7 @@ type SPMTokenizerWrapper struct {
 // Supports Llama, Mistral, Gemma, and other SPM-based models.
 func NewSPMTokenizer(modelPath string) (Tokenizer, error) {
 	if modelPath == "" {
-		return nil, fmt.Errorf("model path is required for SPMTokenizerWrapper")
+		return nil, ErrVocabFileRequired
 	}
 
 	if _, err := os.Stat(modelPath); err != nil {

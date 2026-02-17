@@ -282,6 +282,7 @@ go get github.com/lancekrogers/go-token-counter/tokenizer
 package main
 
 import (
+    "context"
     "fmt"
     "log"
 
@@ -289,9 +290,13 @@ import (
 )
 
 func main() {
-    counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+    counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+    if err != nil {
+        log.Fatal(err)
+    }
 
-    result, err := counter.Count("Hello, world!", "gpt-4o", false)
+    ctx := context.Background()
+    result, err := counter.Count(ctx, "Hello, world!", "gpt-4o", false)
     if err != nil {
         log.Fatal(err)
     }
@@ -346,7 +351,8 @@ openaiModels := tokenizer.ListModelsByProvider(tokenizer.ProviderOpenAI)
 ### Cost Estimation
 
 ```go
-result, _ := counter.Count(text, "gpt-4o", false)
+ctx := context.Background()
+result, _ := counter.Count(ctx, text, "gpt-4o", false)
 costs := tokenizer.CalculateCosts(result.Methods)
 for _, c := range costs {
     fmt.Printf("%s: $%.4f\n", c.Model, c.Cost)

@@ -52,5 +52,5 @@ type CounterOptions struct {
 	CharsPerToken float64
 	WordsPerToken float64
 	VocabFile     string
-	Provider      string
+	Provider      Provider
 }

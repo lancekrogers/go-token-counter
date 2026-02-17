@@ -16,12 +16,13 @@ type Counter struct {
 	charsPerToken float64
 	wordsPerToken float64
 	vocabFile     string
-	provider      string
+	provider      Provider
 	tokenizers    map[string]Tokenizer
 }
 
 // NewCounter creates a new token counter.
-func NewCounter(opts CounterOptions) *Counter {
+// Returns an error if the BPE tokenizers fail to initialize.
+func NewCounter(opts CounterOptions) (*Counter, error) {
 	if opts.CharsPerToken == 0 {
 		opts.CharsPerToken = 4.0
 	}
@@ -29,25 +30,33 @@ func NewCounter(opts CounterOptions) *Counter {
 		opts.WordsPerToken = 0.75
 	}
 
-	return &Counter{
+	c := &Counter{
 		charsPerToken: opts.CharsPerToken,
 		wordsPerToken: opts.WordsPerToken,
 		vocabFile:     opts.VocabFile,
 		provider:      opts.Provider,
 		tokenizers:    make(map[string]Tokenizer),
 	}
+
+	if err := c.initializeTokenizers(); err != nil {
+		return nil, fmt.Errorf("initializing tokenizers: %w", err)
+	}
+
+	return c, nil
 }
 
 // Count performs token counting using specified methods.
-func (c *Counter) Count(text string, model string, all bool) (*CountResult, error) {
+func (c *Counter) Count(ctx context.Context, text string, model string, all bool) (*CountResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	result := &CountResult{
 		Characters: len(text),
 		Words:      countWords(text),
 		Lines:      countLines(text),
 		Methods:    []MethodResult{},
 	}
-
-	c.initializeTokenizers()
 
 	if all || model == "" {
 		result.Methods = c.countAllMethods(text)
@@ -87,7 +96,7 @@ func (c *Counter) CountFile(ctx context.Context, path string, model string, all 
 		return nil, fmt.Errorf("reading file %q: %w", path, err)
 	}
 
-	result, err := c.Count(string(content), model, all)
+	result, err := c.Count(ctx, string(content), model, all)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +111,9 @@ func (c *Counter) CountFile(ctx context.Context, path string, model string, all 
 // It walks the directory respecting .gitignore rules and skipping binary files,
 // aggregates all file contents, and counts tokens on the combined text.
 // Context cancellation is checked between each major operation.
+//
+// Note: this operation loads all text file content into memory before counting.
+// For very large repositories, consider processing files individually with CountFile.
 func (c *Counter) CountDirectory(ctx context.Context, path string, model string, all bool) (*CountResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -129,7 +141,7 @@ func (c *Counter) CountDirectory(ctx context.Context, path string, model string,
 		return nil, err
 	}
 
-	result, err := c.Count(string(content), model, all)
+	result, err := c.Count(ctx, string(content), model, all)
 	if err != nil {
 		return nil, err
 	}
@@ -183,14 +195,14 @@ func (c *Counter) countAllMethods(text string) []MethodResult {
 }
 
 // encodingMatchesProvider checks if an encoding should be included for a provider filter.
-func encodingMatchesProvider(encoding string, provider string) bool {
+func encodingMatchesProvider(encoding string, provider Provider) bool {
 	switch encoding {
 	case "o200k_base":
-		return provider == "openai"
+		return provider == ProviderOpenAI
 	case "cl100k_base":
-		return provider == "openai" || provider == "meta" || provider == "deepseek" || provider == "alibaba" || provider == "microsoft"
+		return provider == ProviderOpenAI || provider == ProviderMeta || provider == ProviderDeepSeek || provider == ProviderAlibaba || provider == ProviderMicrosoft
 	case "claude_approx":
-		return provider == "anthropic"
+		return provider == ProviderAnthropic
 	}
 	return false
 }
@@ -270,24 +282,30 @@ func (c *Counter) getApproximations(text string) []MethodResult {
 }
 
 // initializeTokenizers sets up one tokenizer per unique encoding.
-func (c *Counter) initializeTokenizers() {
-	if len(c.tokenizers) > 0 {
-		return
+func (c *Counter) initializeTokenizers() error {
+	tok, err := NewBPETokenizerByEncoding("o200k_base")
+	if err != nil {
+		return fmt.Errorf("loading o200k_base encoding: %w", err)
 	}
+	c.tokenizers["o200k_base"] = tok
 
-	if tokenizer, err := NewBPETokenizerByEncoding("o200k_base"); err == nil {
-		c.tokenizers["o200k_base"] = tokenizer
+	tok, err = NewBPETokenizerByEncoding("cl100k_base")
+	if err != nil {
+		return fmt.Errorf("loading cl100k_base encoding: %w", err)
 	}
-	if tokenizer, err := NewBPETokenizerByEncoding("cl100k_base"); err == nil {
-		c.tokenizers["cl100k_base"] = tokenizer
-	}
+	c.tokenizers["cl100k_base"] = tok
+
 	c.tokenizers["claude_approx"] = NewClaudeApproximator()
 
 	if c.vocabFile != "" {
-		if tokenizer, err := NewSPMTokenizer(c.vocabFile); err == nil {
-			c.tokenizers["spm"] = tokenizer
+		tok, err = NewSPMTokenizer(c.vocabFile)
+		if err != nil {
+			return fmt.Errorf("loading SentencePiece vocab %q: %w", c.vocabFile, err)
 		}
+		c.tokenizers["spm"] = tok
 	}
+
+	return nil
 }
 
 // countWords counts words in text.
