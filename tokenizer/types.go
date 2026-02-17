@@ -1,5 +1,22 @@
 package tokenizer
 
+import "errors"
+
+// Sentinel errors for common failure modes.
+var (
+	// ErrModelNotFound is returned when a requested model is not in the registry.
+	ErrModelNotFound = errors.New("model not found")
+
+	// ErrEncodingNotFound is returned when a BPE encoding name is not recognized.
+	ErrEncodingNotFound = errors.New("encoding not found")
+
+	// ErrVocabFileRequired is returned when a SentencePiece model path is empty.
+	ErrVocabFileRequired = errors.New("vocab file path is required")
+
+	// ErrBinaryFile is returned when attempting to count tokens in a binary file.
+	ErrBinaryFile = errors.New("file is binary")
+)
+
 // CountResult represents the result of token counting.
 type CountResult struct {
 	FilePath    string         `json:"file_path"`
