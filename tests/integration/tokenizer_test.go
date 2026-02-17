@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/lancekrogers/go-token-counter/internal/tokens"
+	"github.com/lancekrogers/go-token-counter/tokenizer"
 )
 
 func TestIntegrationTokenizer_O200kBase(t *testing.T) {
@@ -20,7 +20,7 @@ func TestIntegrationTokenizer_O200kBase(t *testing.T) {
 		{"unicode", readFixture(t, "unicode.txt"), 18},
 	}
 
-	counter := tokens.NewCounter(tokens.CounterOptions{})
+	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestIntegrationTokenizer_Cl100kBase(t *testing.T) {
 		{"unicode", readFixture(t, "unicode.txt"), 24},
 	}
 
-	counter := tokens.NewCounter(tokens.CounterOptions{})
+	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestIntegrationTokenizer_Cl100kBase(t *testing.T) {
 
 func TestIntegrationTokenizer_AllMethods(t *testing.T) {
 	text := readFixture(t, "sample.txt")
-	counter := tokens.NewCounter(tokens.CounterOptions{})
+	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
 
 	result, err := counter.Count(text, "", true)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestIntegrationTokenizer_AllMethods(t *testing.T) {
 
 func TestIntegrationTokenizer_Approximations(t *testing.T) {
 	text := readFixture(t, "sample.txt")
-	counter := tokens.NewCounter(tokens.CounterOptions{})
+	counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
 
 	result, err := counter.Count(text, "", true)
 	if err != nil {

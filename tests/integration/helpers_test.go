@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/lancekrogers/go-token-counter/internal/tokens"
+	"github.com/lancekrogers/go-token-counter/tokenizer"
 )
 
 var binaryPath string
@@ -64,7 +64,7 @@ func runTcount(t *testing.T, args ...string) (stdout, stderr string, exitCode in
 }
 
 // runTcountJSON executes tcount with --json and parses the result into a CountResult.
-func runTcountJSON(t *testing.T, args ...string) *tokens.CountResult {
+func runTcountJSON(t *testing.T, args ...string) *tokenizer.CountResult {
 	t.Helper()
 
 	fullArgs := append([]string{"--json"}, args...)
@@ -73,7 +73,7 @@ func runTcountJSON(t *testing.T, args ...string) *tokens.CountResult {
 		t.Fatalf("tcount exited with code %d\nstdout: %s\nstderr: %s", exitCode, stdout, stderr)
 	}
 
-	var result tokens.CountResult
+	var result tokenizer.CountResult
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("failed to parse JSON output: %v\nraw: %s", err, stdout)
 	}

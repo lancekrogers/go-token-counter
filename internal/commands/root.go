@@ -13,9 +13,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/lancekrogers/go-token-counter/internal/errors"
-	"github.com/lancekrogers/go-token-counter/internal/fileops"
-	"github.com/lancekrogers/go-token-counter/internal/tokens"
 	"github.com/lancekrogers/go-token-counter/internal/ui"
+	"github.com/lancekrogers/go-token-counter/tokenizer"
+	"github.com/lancekrogers/go-token-counter/tokenizer/fileops"
 )
 
 var (
@@ -248,7 +248,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 		)
 	}
 
-	counter := tokens.NewCounter(tokens.CounterOptions{
+	counter := tokenizer.NewCounter(tokenizer.CounterOptions{
 		CharsPerToken: opts.charsPerToken,
 		WordsPerToken: opts.wordsPerToken,
 		VocabFile:     opts.vocabFile,
@@ -268,7 +268,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 	}
 
 	if opts.showCost {
-		result.Costs = tokens.CalculateCosts(result.Methods)
+		result.Costs = tokenizer.CalculateCosts(result.Methods)
 	}
 
 	if opts.jsonOutput {
@@ -278,7 +278,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 	return outputTable(display, result, opts.showModels)
 }
 
-func outputJSON(result *tokens.CountResult) error {
+func outputJSON(result *tokenizer.CountResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
@@ -296,7 +296,7 @@ func styles() (title, section, label, valStyle lipgloss.Style) {
 	return
 }
 
-func outputTable(_ *ui.UI, result *tokens.CountResult, showModels bool) error {
+func outputTable(_ *ui.UI, result *tokenizer.CountResult, showModels bool) error {
 	titleStyle, sectionStyle, labelStyle, valStyle := styles()
 
 	// Title
@@ -412,7 +412,7 @@ func formatInt(n int) string {
 func outputModelLookup(sectionStyle, labelStyle lipgloss.Style) {
 	fmt.Println(sectionStyle.Render("Model Lookup"))
 
-	byEncoding := tokens.ModelsByEncoding()
+	byEncoding := tokenizer.ModelsByEncoding()
 
 	order := []string{"o200k_base", "cl100k_base", "claude_approx"}
 	for _, enc := range order {

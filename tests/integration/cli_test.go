@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lancekrogers/go-token-counter/internal/tokens"
+	"github.com/lancekrogers/go-token-counter/tokenizer"
 )
 
 func TestIntegrationCLI_SingleFile(t *testing.T) {
@@ -102,7 +102,7 @@ func TestIntegrationCLI_ProviderFilter(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
 
-	var result tokens.CountResult
+	var result tokenizer.CountResult
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("failed to parse JSON: %v", err)
 	}
