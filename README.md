@@ -66,8 +66,9 @@ tcount --json document.md
 ### OpenAI
 | Model | Encoding | Context |
 |-------|----------|---------|
-| `gpt-5`, `gpt-5-mini` | o200k_base | 200K |
-| `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | o200k_base | 128K |
+| `gpt-5`, `gpt-5-mini`, `gpt-5-nano` | o200k_base | 400K |
+| `gpt-5.1`, `gpt-5.2` | o200k_base | 400K |
+| `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | o200k_base | 1M |
 | `gpt-4o`, `gpt-4o-mini` | o200k_base | 128K |
 | `o3`, `o3-mini`, `o4-mini` | o200k_base | 200K |
 | `gpt-4`, `gpt-4-turbo` | cl100k_base | 8K–128K |
@@ -76,10 +77,11 @@ tcount --json document.md
 ### Anthropic
 | Model | Method | Context |
 |-------|--------|---------|
-| `claude-4-opus`, `claude-4-sonnet` | Approximation | 200K |
-| `claude-4.5-sonnet` | Approximation | 200K |
-| `claude-3.7-sonnet`, `claude-3.5-sonnet` | Approximation | 200K |
-| `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` | Approximation | 200K |
+| `claude-opus-4.6`, `claude-opus-4.5` | Approximation | 200K |
+| `claude-opus-4.1`, `claude-opus-4` | Approximation | 200K |
+| `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-sonnet-4` | Approximation | 200K |
+| `claude-haiku-4.5`, `claude-haiku-3.5`, `claude-haiku-3` | Approximation | 200K |
+| `claude-opus-3` (deprecated) | Approximation | 200K |
 
 ### Meta (Llama)
 | Model | Method | Context |
@@ -107,7 +109,7 @@ tcount --json document.md
 
 | Method | Accuracy | When Used |
 |--------|----------|-----------|
-| tiktoken (o200k_base) | Exact | GPT-5, GPT-4.1, GPT-4o, o3, o4-mini |
+| tiktoken (o200k_base) | Exact | GPT-5.x, GPT-4.1, GPT-4o, o3, o4-mini |
 | tiktoken (cl100k_base) | Exact | GPT-4, GPT-3.5 |
 | Claude approximation | Estimated | All Claude models (÷3.8 char ratio) |
 | SentencePiece | Exact | Llama with `--vocab-file` |
@@ -192,8 +194,8 @@ Token Counts by Method:
 Cost Estimates (Input):
   gpt-5:           $0.0018 ($1.25/1M tokens)
   gpt-4o:          $0.0036 ($2.50/1M tokens)
-  claude-4.5-sonnet: $0.0043 ($3.00/1M tokens)
-  claude-4-sonnet: $0.0043 ($3.00/1M tokens)
+  claude-sonnet-4.6: $0.0043 ($3.00/1M tokens)
+  claude-sonnet-4.5: $0.0043 ($3.00/1M tokens)
 ```
 
 ### SentencePiece for exact Llama tokenization

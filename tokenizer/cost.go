@@ -8,8 +8,8 @@ import (
 var mainModels = []string{
 	"gpt-5",
 	"gpt-4o",
-	"claude-4-sonnet",
-	"claude-4.5-sonnet",
+	"claude-sonnet-4.6",
+	"claude-sonnet-4.5",
 }
 
 // characterBasedMethodPrefix identifies character-based approximation methods.

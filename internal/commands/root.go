@@ -56,8 +56,8 @@ func newRootCmd(version string) *cobra.Command {
 Provides token counts using different LLM tokenizers and approximation methods,
 helping you understand token usage and estimate costs.
 
-Supports all modern OpenAI models (GPT-5, GPT-4.1, GPT-4o, o-series) and
-Anthropic Claude models (Claude 4, Claude 3 series).
+Supports all modern OpenAI models (GPT-5.x, GPT-4.1, GPT-4o, o-series) and
+Anthropic Claude models (Opus 4.6, Sonnet 4.6, Haiku 4.5, and earlier).
 
 When counting a directory with --recursive, the command:
   - Respects .gitignore files
@@ -66,7 +66,7 @@ When counting a directory with --recursive, the command:
 		Example: `  tcount document.md                                       # Count tokens in a file
   tcount --model gpt-4o doc.md                             # Use GPT-4o tokenizer
   tcount --model gpt-5 doc.md                              # Use GPT-5 tokenizer
-  tcount --model claude-4-sonnet doc.md                    # Use Claude 4 Sonnet
+  tcount --model claude-sonnet-4.6 doc.md                   # Use Claude Sonnet 4.6
   tcount --model llama-3.1-8b --vocab-file tokenizer.model doc.md  # SentencePiece
   tcount --all --cost doc.md                               # Show all methods with costs
   tcount --json doc.md                                     # Output as JSON
@@ -91,15 +91,17 @@ When counting a directory with --recursive, the command:
 	cmd.Flags().StringVar(&opts.model, "model", "", `specific model to use
 
 OpenAI Models:
-  GPT-5 series:     gpt-5, gpt-5-mini
+  GPT-5 series:     gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.2
   GPT-4.1 series:   gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
   GPT-4o series:    gpt-4o, gpt-4o-mini
   o-series:         o3, o3-mini, o4-mini
   Legacy:           gpt-4, gpt-4-turbo, gpt-3.5-turbo
 
 Anthropic Models:
-  Claude 4 series:  claude-4-opus, claude-4-sonnet, claude-4.5-sonnet
-  Claude 3 series:  claude-3.7-sonnet, claude-3.5-sonnet, claude-3-opus, claude-3-sonnet, claude-3-haiku
+  Opus:             claude-opus-4.6, claude-opus-4.5, claude-opus-4.1, claude-opus-4
+  Sonnet:           claude-sonnet-4.6, claude-sonnet-4.5, claude-sonnet-4
+  Haiku:            claude-haiku-4.5, claude-haiku-3.5, claude-haiku-3
+  Legacy:           claude-opus-3
 
 Open Source Models (BPE approximation):
   Llama:            llama-3.1-8b, llama-3.1-70b, llama-3.1-405b, llama-4-scout, llama-4-maverick

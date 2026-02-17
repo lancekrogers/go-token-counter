@@ -3,6 +3,7 @@ package tokenizer_test
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/lancekrogers/go-token-counter/tokenizer"
 )
@@ -49,6 +50,39 @@ func ExampleCounter_Count() {
 }
 
 func ExampleCounter_CountFile() {
+	f, err := os.CreateTemp("", "tcount-example-*.txt")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.Remove(f.Name())
+
+	if _, err := f.WriteString("Hello, world!"); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	f.Close()
+
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	ctx := context.Background()
+	result, err := counter.CountFile(ctx, f.Name(), "gpt-4o", false)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	for _, m := range result.Methods {
+		if m.IsExact {
+			fmt.Printf("Tokens: %d\n", m.Tokens)
+		}
+	}
+	// Output: Tokens: 4
+}
+
+func ExampleCounter_CountFile_error() {
 	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
 	if err != nil {
 		fmt.Println("error:", err)
@@ -108,8 +142,8 @@ func ExampleCalculateCosts() {
 		fmt.Printf("%s: $%.6f\n", c.Model, c.Cost)
 	}
 	// Output:
-	// gpt-5: $0.000020
+	// gpt-5: $0.000005
 	// gpt-4o: $0.000010
-	// claude-4-sonnet: $0.000012
-	// claude-4.5-sonnet: $0.000012
+	// claude-sonnet-4.6: $0.000012
+	// claude-sonnet-4.5: $0.000012
 }

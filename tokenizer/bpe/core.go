@@ -156,25 +156,25 @@ func (enc *Encoder) decode(tokens []int) []byte {
 	return ret
 }
 
+// findMatchIndex returns the index of the first match of reg in text.
+// The error from FindStringMatch is safe to discard because all regexes
+// are compiled and validated in NewEncoder; a successfully compiled
+// regexp2 pattern will not error during matching.
 func findMatchIndex(text string, reg *regexp2.Regexp) []int {
 	m, _ := reg.FindStringMatch(text)
 	if m == nil {
 		return nil
 	}
-	result := make([]int, 2)
-	result[0] = m.Index
-	result[1] = m.Index + m.Length
-	return result
+	return []int{m.Index, m.Index + m.Length}
 }
 
+// findAllMatchIndices returns indices of all non-overlapping matches.
+// See findMatchIndex for why errors are safe to discard.
 func findAllMatchIndices(text string, reg *regexp2.Regexp) [][]int {
 	var matches [][]int
 	m, _ := reg.FindStringMatch(text)
 	for m != nil {
-		result := make([]int, 2)
-		result[0] = m.Index
-		result[1] = m.Index + m.Length
-		matches = append(matches, result)
+		matches = append(matches, []int{m.Index, m.Index + m.Length})
 		m, _ = reg.FindNextMatch(m)
 	}
 	return matches

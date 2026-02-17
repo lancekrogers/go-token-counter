@@ -40,7 +40,7 @@ type BPETokenizerWrapper struct {
 // Supports OpenAI models (gpt-4o, gpt-5, o3, o4-mini, etc.) and
 // open-source models that use BPE-compatible encodings.
 func NewBPETokenizer(model string) (Tokenizer, error) {
-	encodingName := getEncodingForModel(model)
+	encodingName, _ := getEncodingForModel(model)
 	return NewBPETokenizerByEncoding(encodingName)
 }
 
@@ -83,38 +83,40 @@ func (t *BPETokenizerWrapper) IsExact() bool {
 }
 
 // getEncodingForModel maps model names to encoding types.
-func getEncodingForModel(model string) string {
+// The second return value indicates whether the model was recognized.
+// Unrecognized models fall back to o200k_base.
+func getEncodingForModel(model string) (string, bool) {
 	model = strings.ToLower(model)
 
 	if strings.HasPrefix(model, "gpt-5") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
 	if strings.HasPrefix(model, "gpt-4.1") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
 	if strings.HasPrefix(model, "gpt-4o") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
 	if strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
 
 	if strings.HasPrefix(model, "gpt-4") || strings.HasPrefix(model, "gpt-3.5") {
-		return "cl100k_base"
+		return "cl100k_base", true
 	}
 
 	if strings.HasPrefix(model, "llama-") ||
 		strings.HasPrefix(model, "deepseek-") ||
 		strings.HasPrefix(model, "qwen-") ||
 		strings.HasPrefix(model, "phi-") {
-		return "cl100k_base"
+		return "cl100k_base", true
 	}
 
 	if strings.Contains(model, "davinci") || strings.Contains(model, "curie") {
-		return "p50k_base"
+		return "p50k_base", true
 	}
 
-	return "o200k_base"
+	return "o200k_base", false
 }
 
 // claudeCharsPerToken is the approximate character-to-token ratio for Claude models.

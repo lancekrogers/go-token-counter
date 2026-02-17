@@ -89,12 +89,20 @@ func WalkDirectory(ctx context.Context, rootPath string) (*WalkResult, error) {
 }
 
 // AggregateFileContents reads all files and returns combined content.
+// Pre-allocates the result buffer based on file sizes to minimize allocations.
 func AggregateFileContents(ctx context.Context, files []string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	var totalContent []byte
+	totalSize := int64(0)
+	for _, file := range files {
+		if info, err := os.Stat(file); err == nil {
+			totalSize += info.Size()
+		}
+	}
+
+	totalContent := make([]byte, 0, totalSize)
 
 	for _, file := range files {
 		if ctxErr := ctx.Err(); ctxErr != nil {
