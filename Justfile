@@ -45,7 +45,7 @@ deps:
 download-vocab:
     #!/usr/bin/env bash
     set -euo pipefail
-    dir="internal/bpe/vocabdata"
+    dir="tokenizer/bpe/vocabdata"
     base="https://openaipublic.blob.core.windows.net/encodings"
     for name in o200k_base cl100k_base p50k_base r50k_base; do
         echo "Downloading ${name}..."

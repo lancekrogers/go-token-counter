@@ -210,10 +210,10 @@ Without `--vocab-file`, Llama models use a tiktoken-based approximation.
 ### Directory scanning
 
 ```
-$ tcount -r --verbose internal/tokens/
+$ tcount -r --verbose tokenizer/
 
 Found 4 text files (skipped 0 binary, 0 ignored)
-Token Count Report for: internal/tokens/ (directory)
+Token Count Report for: tokenizer/ (directory)
 ═══════════════════════════════════════════════════════
 
 Basic Statistics:
@@ -264,6 +264,93 @@ tcount --json myfile.txt | jq '.methods[] | select(.name == "tiktoken_gpt_5") | 
 
 # Batch count all markdown files
 for f in docs/*.md; do tcount --json "$f"; done | jq -s '.'
+```
+
+## Library Usage
+
+go-token-counter can be used as a Go library in your own projects.
+
+### Installation
+
+```bash
+go get github.com/lancekrogers/go-token-counter/tokenizer
+```
+
+### Basic Token Counting
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    "github.com/lancekrogers/go-token-counter/tokenizer"
+)
+
+func main() {
+    counter := tokenizer.NewCounter(tokenizer.CounterOptions{})
+
+    result, err := counter.Count("Hello, world!", "gpt-4o", false)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, m := range result.Methods {
+        if m.IsExact {
+            fmt.Printf("Tokens: %d (exact, %s)\n", m.Tokens, m.DisplayName)
+        }
+    }
+}
+```
+
+### File and Directory Counting
+
+```go
+ctx := context.Background()
+
+// Count tokens in a single file
+result, err := counter.CountFile(ctx, "document.md", "gpt-4o", false)
+
+// Count tokens across a directory (respects .gitignore, skips binaries)
+result, err := counter.CountDirectory(ctx, "./src", "", true)
+fmt.Printf("Files: %d, Tokens: %d\n", result.FileCount, result.Methods[0].Tokens)
+```
+
+### Direct BPE Tokenizer Access
+
+```go
+tok, err := tokenizer.NewBPETokenizer("gpt-4o")
+if err != nil {
+    log.Fatal(err)
+}
+
+count, _ := tok.CountTokens("Hello, world!")
+fmt.Printf("Tokens: %d, Exact: %v\n", count, tok.IsExact())
+```
+
+### Model Discovery
+
+```go
+// Get metadata for a specific model
+meta := tokenizer.GetModelMetadata("gpt-4o")
+fmt.Printf("Encoding: %s, Context: %d\n", meta.Encoding, meta.ContextWindow)
+
+// List all registered models
+models := tokenizer.ListModels()
+
+// List models by provider
+openaiModels := tokenizer.ListModelsByProvider(tokenizer.ProviderOpenAI)
+```
+
+### Cost Estimation
+
+```go
+result, _ := counter.Count(text, "gpt-4o", false)
+costs := tokenizer.CalculateCosts(result.Methods)
+for _, c := range costs {
+    fmt.Printf("%s: $%.4f\n", c.Model, c.Cost)
+}
 ```
 
 ## Development
