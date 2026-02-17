@@ -66,8 +66,9 @@ tcount --json document.md
 ### OpenAI
 | Model | Encoding | Context |
 |-------|----------|---------|
-| `gpt-5`, `gpt-5-mini` | o200k_base | 200K |
-| `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | o200k_base | 128K |
+| `gpt-5`, `gpt-5-mini`, `gpt-5-nano` | o200k_base | 400K |
+| `gpt-5.1`, `gpt-5.2` | o200k_base | 400K |
+| `gpt-4.1`, `gpt-4.1-mini`, `gpt-4.1-nano` | o200k_base | 1M |
 | `gpt-4o`, `gpt-4o-mini` | o200k_base | 128K |
 | `o3`, `o3-mini`, `o4-mini` | o200k_base | 200K |
 | `gpt-4`, `gpt-4-turbo` | cl100k_base | 8K–128K |
@@ -76,10 +77,11 @@ tcount --json document.md
 ### Anthropic
 | Model | Method | Context |
 |-------|--------|---------|
-| `claude-4-opus`, `claude-4-sonnet` | Approximation | 200K |
-| `claude-4.5-sonnet` | Approximation | 200K |
-| `claude-3.7-sonnet`, `claude-3.5-sonnet` | Approximation | 200K |
-| `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku` | Approximation | 200K |
+| `claude-opus-4.6`, `claude-opus-4.5` | Approximation | 200K |
+| `claude-opus-4.1`, `claude-opus-4` | Approximation | 200K |
+| `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-sonnet-4` | Approximation | 200K |
+| `claude-haiku-4.5`, `claude-haiku-3.5`, `claude-haiku-3` | Approximation | 200K |
+| `claude-opus-3` (deprecated) | Approximation | 200K |
 
 ### Meta (Llama)
 | Model | Method | Context |
@@ -107,7 +109,7 @@ tcount --json document.md
 
 | Method | Accuracy | When Used |
 |--------|----------|-----------|
-| tiktoken (o200k_base) | Exact | GPT-5, GPT-4.1, GPT-4o, o3, o4-mini |
+| tiktoken (o200k_base) | Exact | GPT-5.x, GPT-4.1, GPT-4o, o3, o4-mini |
 | tiktoken (cl100k_base) | Exact | GPT-4, GPT-3.5 |
 | Claude approximation | Estimated | All Claude models (÷3.8 char ratio) |
 | SentencePiece | Exact | Llama with `--vocab-file` |
@@ -192,8 +194,8 @@ Token Counts by Method:
 Cost Estimates (Input):
   gpt-5:           $0.0018 ($1.25/1M tokens)
   gpt-4o:          $0.0036 ($2.50/1M tokens)
-  claude-4.5-sonnet: $0.0043 ($3.00/1M tokens)
-  claude-4-sonnet: $0.0043 ($3.00/1M tokens)
+  claude-sonnet-4.6: $0.0043 ($3.00/1M tokens)
+  claude-sonnet-4.5: $0.0043 ($3.00/1M tokens)
 ```
 
 ### SentencePiece for exact Llama tokenization
@@ -210,10 +212,10 @@ Without `--vocab-file`, Llama models use a tiktoken-based approximation.
 ### Directory scanning
 
 ```
-$ tcount -r --verbose internal/tokens/
+$ tcount -r --verbose tokenizer/
 
 Found 4 text files (skipped 0 binary, 0 ignored)
-Token Count Report for: internal/tokens/ (directory)
+Token Count Report for: tokenizer/ (directory)
 ═══════════════════════════════════════════════════════
 
 Basic Statistics:
@@ -264,6 +266,99 @@ tcount --json myfile.txt | jq '.methods[] | select(.name == "tiktoken_gpt_5") | 
 
 # Batch count all markdown files
 for f in docs/*.md; do tcount --json "$f"; done | jq -s '.'
+```
+
+## Library Usage
+
+go-token-counter can be used as a Go library in your own projects.
+
+### Installation
+
+```bash
+go get github.com/lancekrogers/go-token-counter/tokenizer
+```
+
+### Basic Token Counting
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/lancekrogers/go-token-counter/tokenizer"
+)
+
+func main() {
+    counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{})
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    ctx := context.Background()
+    result, err := counter.Count(ctx, "Hello, world!", "gpt-4o", false)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, m := range result.Methods {
+        if m.IsExact {
+            fmt.Printf("Tokens: %d (exact, %s)\n", m.Tokens, m.DisplayName)
+        }
+    }
+}
+```
+
+### File and Directory Counting
+
+```go
+ctx := context.Background()
+
+// Count tokens in a single file
+result, err := counter.CountFile(ctx, "document.md", "gpt-4o", false)
+
+// Count tokens across a directory (respects .gitignore, skips binaries)
+result, err := counter.CountDirectory(ctx, "./src", "", true)
+fmt.Printf("Files: %d, Tokens: %d\n", result.FileCount, result.Methods[0].Tokens)
+```
+
+### Direct BPE Tokenizer Access
+
+```go
+tok, err := tokenizer.NewBPETokenizer("gpt-4o")
+if err != nil {
+    log.Fatal(err)
+}
+
+count, _ := tok.CountTokens("Hello, world!")
+fmt.Printf("Tokens: %d, Exact: %v\n", count, tok.IsExact())
+```
+
+### Model Discovery
+
+```go
+// Get metadata for a specific model
+meta := tokenizer.GetModelMetadata("gpt-4o")
+fmt.Printf("Encoding: %s, Context: %d\n", meta.Encoding, meta.ContextWindow)
+
+// List all registered models
+models := tokenizer.ListModels()
+
+// List models by provider
+openaiModels := tokenizer.ListModelsByProvider(tokenizer.ProviderOpenAI)
+```
+
+### Cost Estimation
+
+```go
+ctx := context.Background()
+result, _ := counter.Count(ctx, text, "gpt-4o", false)
+costs := tokenizer.CalculateCosts(result.Methods)
+for _, c := range costs {
+    fmt.Printf("%s: $%.4f\n", c.Model, c.Cost)
+}
 ```
 
 ## Development

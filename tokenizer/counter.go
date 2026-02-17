@@ -1,71 +1,28 @@
-package tokens
+package tokenizer
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"unicode"
 
-	"github.com/lancekrogers/go-token-counter/internal/errors"
+	"github.com/lancekrogers/go-token-counter/tokenizer/fileops"
 )
-
-// CountResult represents the result of token counting.
-type CountResult struct {
-	FilePath    string         `json:"file_path"`
-	IsDirectory bool           `json:"is_directory,omitempty"`
-	FileCount   int            `json:"file_count,omitempty"`
-	FileSize    int            `json:"file_size"`
-	Characters  int            `json:"characters"`
-	Words       int            `json:"words"`
-	Lines       int            `json:"lines"`
-	Methods     []MethodResult `json:"methods"`
-	Costs       []CostEstimate `json:"costs,omitempty"`
-}
-
-// MethodResult represents token count for a specific method.
-type MethodResult struct {
-	Name          string `json:"name"`
-	DisplayName   string `json:"display_name"`
-	Tokens        int    `json:"tokens"`
-	IsExact       bool   `json:"is_exact"`
-	ContextWindow int    `json:"context_window,omitempty"`
-}
-
-// CostEstimate represents cost estimation for a model.
-type CostEstimate struct {
-	Model     string  `json:"model"`
-	Tokens    int     `json:"tokens"`
-	Cost      float64 `json:"cost"`
-	RatePer1M float64 `json:"rate_per_1m"`
-}
-
-// CounterOptions configures the counter.
-type CounterOptions struct {
-	CharsPerToken float64
-	WordsPerToken float64
-	VocabFile     string
-	Provider      string
-}
 
 // Counter handles token counting.
 type Counter struct {
 	charsPerToken float64
 	wordsPerToken float64
 	vocabFile     string
-	provider      string
+	provider      Provider
 	tokenizers    map[string]Tokenizer
 }
 
-// Tokenizer interface for different tokenization methods.
-type Tokenizer interface {
-	CountTokens(text string) (int, error)
-	Name() string
-	DisplayName() string
-	IsExact() bool
-}
-
 // NewCounter creates a new token counter.
-func NewCounter(opts CounterOptions) *Counter {
+// Returns an error if the BPE tokenizers fail to initialize.
+func NewCounter(opts CounterOptions) (*Counter, error) {
 	if opts.CharsPerToken == 0 {
 		opts.CharsPerToken = 4.0
 	}
@@ -73,17 +30,27 @@ func NewCounter(opts CounterOptions) *Counter {
 		opts.WordsPerToken = 0.75
 	}
 
-	return &Counter{
+	c := &Counter{
 		charsPerToken: opts.CharsPerToken,
 		wordsPerToken: opts.WordsPerToken,
 		vocabFile:     opts.VocabFile,
 		provider:      opts.Provider,
 		tokenizers:    make(map[string]Tokenizer),
 	}
+
+	if err := c.initializeTokenizers(); err != nil {
+		return nil, fmt.Errorf("initializing tokenizers: %w", err)
+	}
+
+	return c, nil
 }
 
 // Count performs token counting using specified methods.
-func (c *Counter) Count(text string, model string, all bool) (*CountResult, error) {
+func (c *Counter) Count(ctx context.Context, text string, model string, all bool) (*CountResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	result := &CountResult{
 		Characters: len(text),
 		Words:      countWords(text),
@@ -91,18 +58,98 @@ func (c *Counter) Count(text string, model string, all bool) (*CountResult, erro
 		Methods:    []MethodResult{},
 	}
 
-	// Initialize tokenizers if needed
-	c.initializeTokenizers()
-
 	if all || model == "" {
 		result.Methods = c.countAllMethods(text)
 	} else {
 		methods, err := c.countSpecificModel(text, model)
 		if err != nil {
-			return nil, errors.Wrap(err, "counting tokens for model").WithField("model", model)
+			return nil, fmt.Errorf("counting tokens for model %q: %w", model, err)
 		}
 		result.Methods = methods
 	}
+
+	return result, nil
+}
+
+// CountFile counts tokens in a single file.
+// It checks for context cancellation, rejects binary files, reads the file
+// content, and delegates to Count. The result includes FilePath and FileSize.
+func (c *Counter) CountFile(ctx context.Context, path string, model string, all bool) (*CountResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	isBinary, err := fileops.IsBinaryFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("checking if file is binary %q: %w", path, err)
+	}
+	if isBinary {
+		return nil, fmt.Errorf("file %q: %w", path, ErrBinaryFile)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading file %q: %w", path, err)
+	}
+
+	result, err := c.Count(ctx, string(content), model, all)
+	if err != nil {
+		return nil, err
+	}
+
+	result.FilePath = path
+	result.FileSize = len(content)
+
+	return result, nil
+}
+
+// CountDirectory counts tokens across all text files in a directory.
+// It walks the directory respecting .gitignore rules and skipping binary files,
+// aggregates all file contents, and counts tokens on the combined text.
+// Context cancellation is checked between each major operation.
+//
+// Note: this operation loads all text file content into memory before counting.
+// For very large repositories, consider processing files individually with CountFile.
+func (c *Counter) CountDirectory(ctx context.Context, path string, model string, all bool) (*CountResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	walkResult, err := fileops.WalkDirectory(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("walking directory %q: %w", path, err)
+	}
+
+	if len(walkResult.Files) == 0 {
+		return nil, fmt.Errorf("no text files found in directory %q", path)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	content, err := fileops.AggregateFileContents(ctx, walkResult.Files)
+	if err != nil {
+		return nil, fmt.Errorf("reading files in %q: %w", path, err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	result, err := c.Count(ctx, string(content), model, all)
+	if err != nil {
+		return nil, err
+	}
+
+	result.FilePath = path
+	result.FileSize = len(content)
+	result.IsDirectory = true
+	result.FileCount = len(walkResult.Files)
 
 	return result, nil
 }
@@ -112,7 +159,6 @@ func (c *Counter) countAllMethods(text string) []MethodResult {
 	methods := []MethodResult{}
 	seen := make(map[string]bool)
 
-	// Collect encoding keys sorted for deterministic output
 	keys := make([]string, 0, len(c.tokenizers))
 	for k := range c.tokenizers {
 		keys = append(keys, k)
@@ -122,7 +168,6 @@ func (c *Counter) countAllMethods(text string) []MethodResult {
 	for _, encoding := range keys {
 		tokenizer := c.tokenizers[encoding]
 
-		// Filter by provider if specified
 		if c.provider != "" && c.provider != "all" {
 			if !encodingMatchesProvider(encoding, c.provider) {
 				continue
@@ -150,15 +195,14 @@ func (c *Counter) countAllMethods(text string) []MethodResult {
 }
 
 // encodingMatchesProvider checks if an encoding should be included for a provider filter.
-func encodingMatchesProvider(encoding string, provider string) bool {
+func encodingMatchesProvider(encoding string, provider Provider) bool {
 	switch encoding {
 	case "o200k_base":
-		return provider == "openai"
+		return provider == ProviderOpenAI
 	case "cl100k_base":
-		// cl100k_base is used by openai legacy + open source models
-		return provider == "openai" || provider == "meta" || provider == "deepseek" || provider == "alibaba" || provider == "microsoft"
+		return provider == ProviderOpenAI || provider == ProviderMeta || provider == ProviderDeepSeek || provider == ProviderAlibaba || provider == ProviderMicrosoft
 	case "claude_approx":
-		return provider == "anthropic"
+		return provider == ProviderAnthropic
 	}
 	return false
 }
@@ -167,7 +211,6 @@ func encodingMatchesProvider(encoding string, provider string) bool {
 func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult, error) {
 	methods := []MethodResult{}
 
-	// Look up the model's encoding and find the right tokenizer
 	meta := GetModelMetadata(model)
 	if meta != nil {
 		if tokenizer, ok := c.tokenizers[meta.Encoding]; ok {
@@ -176,17 +219,16 @@ func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult,
 				return nil, err
 			}
 			methods = append(methods, MethodResult{
-				Name:        fmt.Sprintf("bpe_%s", strings.ReplaceAll(model, "-", "_")),
-				DisplayName: fmt.Sprintf("%s (%s)", meta.Encoding, model),
-				Tokens:      count,
-				IsExact:     tokenizer.IsExact(),
+				Name:          fmt.Sprintf("bpe_%s", strings.ReplaceAll(model, "-", "_")),
+				DisplayName:   fmt.Sprintf("%s (%s)", meta.Encoding, model),
+				Tokens:        count,
+				IsExact:       tokenizer.IsExact(),
 				ContextWindow: meta.ContextWindow,
 			})
 			return methods, nil
 		}
 	}
 
-	// Direct tokenizer lookup fallback (handles models registered directly)
 	if tokenizer, ok := c.tokenizers[model]; ok {
 		count, err := tokenizer.CountTokens(text)
 		if err != nil {
@@ -205,7 +247,6 @@ func (c *Counter) countSpecificModel(text string, model string) ([]MethodResult,
 		return methods, nil
 	}
 
-	// Fall back to approximations for unknown models
 	methods = append(methods, c.getApproximations(text)...)
 	return methods, nil
 }
@@ -241,38 +282,30 @@ func (c *Counter) getApproximations(text string) []MethodResult {
 }
 
 // initializeTokenizers sets up one tokenizer per unique encoding.
-func (c *Counter) initializeTokenizers() {
-	if len(c.tokenizers) > 0 {
-		return
+func (c *Counter) initializeTokenizers() error {
+	tok, err := NewBPETokenizerByEncoding("o200k_base")
+	if err != nil {
+		return fmt.Errorf("loading o200k_base encoding: %w", err)
 	}
+	c.tokenizers["o200k_base"] = tok
 
-	// One tokenizer per encoding, not one per model
-	if tokenizer, err := NewBPETokenizerByEncoding("o200k_base"); err == nil {
-		c.tokenizers["o200k_base"] = tokenizer
+	tok, err = NewBPETokenizerByEncoding("cl100k_base")
+	if err != nil {
+		return fmt.Errorf("loading cl100k_base encoding: %w", err)
 	}
-	if tokenizer, err := NewBPETokenizerByEncoding("cl100k_base"); err == nil {
-		c.tokenizers["cl100k_base"] = tokenizer
-	}
+	c.tokenizers["cl100k_base"] = tok
+
 	c.tokenizers["claude_approx"] = NewClaudeApproximator()
 
-	// SentencePiece tokenizer (when vocab file is provided)
 	if c.vocabFile != "" {
-		if tokenizer, err := NewSPMTokenizer(c.vocabFile); err == nil {
-			c.tokenizers["spm"] = tokenizer
+		tok, err = NewSPMTokenizer(c.vocabFile)
+		if err != nil {
+			return fmt.Errorf("loading SentencePiece vocab %q: %w", c.vocabFile, err)
 		}
+		c.tokenizers["spm"] = tok
 	}
-}
 
-// ModelsByEncoding returns a map of encoding name to sorted model names.
-func ModelsByEncoding() map[string][]string {
-	result := make(map[string][]string)
-	for name, meta := range modelRegistry {
-		result[meta.Encoding] = append(result[meta.Encoding], name)
-	}
-	for enc := range result {
-		sort.Strings(result[enc])
-	}
-	return result
+	return nil
 }
 
 // countWords counts words in text.

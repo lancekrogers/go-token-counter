@@ -13,9 +13,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/lancekrogers/go-token-counter/internal/errors"
-	"github.com/lancekrogers/go-token-counter/internal/fileops"
-	"github.com/lancekrogers/go-token-counter/internal/tokens"
 	"github.com/lancekrogers/go-token-counter/internal/ui"
+	"github.com/lancekrogers/go-token-counter/tokenizer"
+	"github.com/lancekrogers/go-token-counter/tokenizer/fileops"
 )
 
 var (
@@ -56,8 +56,8 @@ func newRootCmd(version string) *cobra.Command {
 Provides token counts using different LLM tokenizers and approximation methods,
 helping you understand token usage and estimate costs.
 
-Supports all modern OpenAI models (GPT-5, GPT-4.1, GPT-4o, o-series) and
-Anthropic Claude models (Claude 4, Claude 3 series).
+Supports all modern OpenAI models (GPT-5.x, GPT-4.1, GPT-4o, o-series) and
+Anthropic Claude models (Opus 4.6, Sonnet 4.6, Haiku 4.5, and earlier).
 
 When counting a directory with --recursive, the command:
   - Respects .gitignore files
@@ -66,7 +66,7 @@ When counting a directory with --recursive, the command:
 		Example: `  tcount document.md                                       # Count tokens in a file
   tcount --model gpt-4o doc.md                             # Use GPT-4o tokenizer
   tcount --model gpt-5 doc.md                              # Use GPT-5 tokenizer
-  tcount --model claude-4-sonnet doc.md                    # Use Claude 4 Sonnet
+  tcount --model claude-sonnet-4.6 doc.md                   # Use Claude Sonnet 4.6
   tcount --model llama-3.1-8b --vocab-file tokenizer.model doc.md  # SentencePiece
   tcount --all --cost doc.md                               # Show all methods with costs
   tcount --json doc.md                                     # Output as JSON
@@ -91,15 +91,17 @@ When counting a directory with --recursive, the command:
 	cmd.Flags().StringVar(&opts.model, "model", "", `specific model to use
 
 OpenAI Models:
-  GPT-5 series:     gpt-5, gpt-5-mini
+  GPT-5 series:     gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.2
   GPT-4.1 series:   gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
   GPT-4o series:    gpt-4o, gpt-4o-mini
   o-series:         o3, o3-mini, o4-mini
   Legacy:           gpt-4, gpt-4-turbo, gpt-3.5-turbo
 
 Anthropic Models:
-  Claude 4 series:  claude-4-opus, claude-4-sonnet, claude-4.5-sonnet
-  Claude 3 series:  claude-3.7-sonnet, claude-3.5-sonnet, claude-3-opus, claude-3-sonnet, claude-3-haiku
+  Opus:             claude-opus-4.6, claude-opus-4.5, claude-opus-4.1, claude-opus-4
+  Sonnet:           claude-sonnet-4.6, claude-sonnet-4.5, claude-sonnet-4
+  Haiku:            claude-haiku-4.5, claude-haiku-3.5, claude-haiku-3
+  Legacy:           claude-opus-3
 
 Open Source Models (BPE approximation):
   Llama:            llama-3.1-8b, llama-3.1-70b, llama-3.1-405b, llama-4-scout, llama-4-maverick
@@ -122,30 +124,12 @@ Download vocab files from HuggingFace (see error messages for URLs)`)
 	return cmd
 }
 
-// validModels returns the list of valid model names.
-func validModels() []string {
-	return []string{
-		"gpt-5", "gpt-5-mini",
-		"gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-		"gpt-4o", "gpt-4o-mini",
-		"o3", "o3-mini", "o4-mini",
-		"gpt-4", "gpt-4-turbo", "gpt-3.5-turbo",
-		"claude-4-opus", "claude-4-sonnet", "claude-4.5-sonnet",
-		"claude-3.7-sonnet", "claude-3.5-sonnet",
-		"claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3",
-		"llama-3.1-8b", "llama-3.1-70b", "llama-3.1-405b", "llama-4-scout", "llama-4-maverick",
-		"deepseek-v2", "deepseek-v3", "deepseek-coder-v2",
-		"qwen-2.5-7b", "qwen-2.5-14b", "qwen-2.5-72b", "qwen-3-72b",
-		"phi-3-mini", "phi-3-small", "phi-3-medium",
-	}
-}
-
-// isValidModel checks if a model name is valid.
+// isValidModel checks if a model name is valid using the tokenizer registry.
 func isValidModel(model string) bool {
 	if model == "" {
 		return true
 	}
-	for _, valid := range validModels() {
+	for _, valid := range tokenizer.ListModels() {
 		if model == valid {
 			return true
 		}
@@ -248,14 +232,17 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 		)
 	}
 
-	counter := tokens.NewCounter(tokens.CounterOptions{
+	counter, err := tokenizer.NewCounter(tokenizer.CounterOptions{
 		CharsPerToken: opts.charsPerToken,
 		WordsPerToken: opts.wordsPerToken,
 		VocabFile:     opts.vocabFile,
-		Provider:      opts.provider,
+		Provider:      tokenizer.Provider(opts.provider),
 	})
+	if err != nil {
+		return errors.Wrap(err, "creating token counter")
+	}
 
-	result, err := counter.Count(string(content), opts.model, opts.all)
+	result, err := counter.Count(ctx, string(content), opts.model, opts.all)
 	if err != nil {
 		return errors.Wrap(err, "counting tokens")
 	}
@@ -268,7 +255,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 	}
 
 	if opts.showCost {
-		result.Costs = tokens.CalculateCosts(result.Methods)
+		result.Costs = tokenizer.CalculateCosts(result.Methods)
 	}
 
 	if opts.jsonOutput {
@@ -278,7 +265,7 @@ func runCount(ctx context.Context, path string, opts *countOptions) error {
 	return outputTable(display, result, opts.showModels)
 }
 
-func outputJSON(result *tokens.CountResult) error {
+func outputJSON(result *tokenizer.CountResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
@@ -296,7 +283,7 @@ func styles() (title, section, label, valStyle lipgloss.Style) {
 	return
 }
 
-func outputTable(_ *ui.UI, result *tokens.CountResult, showModels bool) error {
+func outputTable(_ *ui.UI, result *tokenizer.CountResult, showModels bool) error {
 	titleStyle, sectionStyle, labelStyle, valStyle := styles()
 
 	// Title
@@ -412,7 +399,7 @@ func formatInt(n int) string {
 func outputModelLookup(sectionStyle, labelStyle lipgloss.Style) {
 	fmt.Println(sectionStyle.Render("Model Lookup"))
 
-	byEncoding := tokens.ModelsByEncoding()
+	byEncoding := tokenizer.ModelsByEncoding()
 
 	order := []string{"o200k_base", "cl100k_base", "claude_approx"}
 	for _, enc := range order {

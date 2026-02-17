@@ -1,4 +1,9 @@
-package tokens
+// Package tokenizer provides token counting for LLM models.
+//
+// It supports exact BPE tokenization for OpenAI models, character-based
+// approximation for Claude models, and SentencePiece tokenization for
+// open-source models like Llama and Mistral.
+package tokenizer
 
 import (
 	"fmt"
@@ -6,9 +11,24 @@ import (
 	"strings"
 
 	sentencepiece "github.com/eliben/go-sentencepiece"
-	"github.com/lancekrogers/go-token-counter/internal/bpe"
-	"github.com/lancekrogers/go-token-counter/internal/errors"
+	"github.com/lancekrogers/go-token-counter/tokenizer/bpe"
 )
+
+// Tokenizer counts tokens in text using a specific tokenization method.
+type Tokenizer interface {
+	// CountTokens returns the token count for the given text.
+	CountTokens(text string) (int, error)
+
+	// Name returns the tokenizer's machine-readable identifier.
+	Name() string
+
+	// DisplayName returns the tokenizer's human-readable name.
+	DisplayName() string
+
+	// IsExact returns true if this tokenizer produces exact counts
+	// (as opposed to approximations).
+	IsExact() bool
+}
 
 // BPETokenizerWrapper implements exact tokenization using a BPE encoding.
 type BPETokenizerWrapper struct {
@@ -16,17 +36,20 @@ type BPETokenizerWrapper struct {
 	tokenizer    *bpe.BPETokenizer
 }
 
-// NewBPETokenizer creates a new BPE-based tokenizer for a specific model.
-func NewBPETokenizer(model string) (*BPETokenizerWrapper, error) {
-	encodingName := getEncodingForModel(model)
+// NewBPETokenizer creates an exact tokenizer for the given model name.
+// Supports OpenAI models (gpt-4o, gpt-5, o3, o4-mini, etc.) and
+// open-source models that use BPE-compatible encodings.
+func NewBPETokenizer(model string) (Tokenizer, error) {
+	encodingName, _ := getEncodingForModel(model)
 	return NewBPETokenizerByEncoding(encodingName)
 }
 
-// NewBPETokenizerByEncoding creates a tokenizer directly from an encoding name.
-func NewBPETokenizerByEncoding(encodingName string) (*BPETokenizerWrapper, error) {
+// NewBPETokenizerByEncoding creates a tokenizer for a specific BPE encoding.
+// Supported encodings: o200k_base, cl100k_base, p50k_base, r50k_base.
+func NewBPETokenizerByEncoding(encodingName string) (Tokenizer, error) {
 	tokenizer, err := bpe.NewEncoderByName(encodingName)
 	if err != nil {
-		return nil, errors.Wrap(err, "getting encoding").WithField("encoding", encodingName)
+		return nil, fmt.Errorf("getting encoding %q: %w", encodingName, err)
 	}
 
 	return &BPETokenizerWrapper{
@@ -37,7 +60,10 @@ func NewBPETokenizerByEncoding(encodingName string) (*BPETokenizerWrapper, error
 
 // CountTokens counts tokens using BPE tokenization.
 func (t *BPETokenizerWrapper) CountTokens(text string) (int, error) {
-	tokens := t.tokenizer.Encode(text, nil, nil)
+	tokens, err := t.tokenizer.Encode(text, nil, nil)
+	if err != nil {
+		return 0, fmt.Errorf("encoding text: %w", err)
+	}
 	return len(tokens), nil
 }
 
@@ -57,63 +83,58 @@ func (t *BPETokenizerWrapper) IsExact() bool {
 }
 
 // getEncodingForModel maps model names to encoding types.
-// Order matters: check o200k_base models FIRST, then fall back to cl100k_base.
-func getEncodingForModel(model string) string {
+// The second return value indicates whether the model was recognized.
+// Unrecognized models fall back to o200k_base.
+func getEncodingForModel(model string) (string, bool) {
 	model = strings.ToLower(model)
 
-	// o200k_base models (check these FIRST to avoid prefix collisions)
-	// GPT-5 series
 	if strings.HasPrefix(model, "gpt-5") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
-	// GPT-4.1 series
 	if strings.HasPrefix(model, "gpt-4.1") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
-	// GPT-4o series (must check before "gpt-4")
 	if strings.HasPrefix(model, "gpt-4o") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
-	// o-series models (o3, o3-mini, o4-mini)
 	if strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
-		return "o200k_base"
+		return "o200k_base", true
 	}
 
-	// cl100k_base models (legacy)
 	if strings.HasPrefix(model, "gpt-4") || strings.HasPrefix(model, "gpt-3.5") {
-		return "cl100k_base"
+		return "cl100k_base", true
 	}
 
-	// Open source models (Llama, DeepSeek, Qwen, Phi)
-	// These use cl100k_base as a reasonable approximation
 	if strings.HasPrefix(model, "llama-") ||
 		strings.HasPrefix(model, "deepseek-") ||
 		strings.HasPrefix(model, "qwen-") ||
 		strings.HasPrefix(model, "phi-") {
-		return "cl100k_base"
+		return "cl100k_base", true
 	}
 
-	// p50k_base models (older models)
 	if strings.Contains(model, "davinci") || strings.Contains(model, "curie") {
-		return "p50k_base"
+		return "p50k_base", true
 	}
 
-	// Default to o200k_base for unknown modern models
-	return "o200k_base"
+	return "o200k_base", false
 }
+
+// claudeCharsPerToken is the approximate character-to-token ratio for Claude models.
+// Based on Anthropic's documentation of ~3.8 characters per token for English text.
+const claudeCharsPerToken = 3.8
 
 // ClaudeApproximator provides approximation for Claude models.
 type ClaudeApproximator struct{}
 
-// NewClaudeApproximator creates a new Claude approximator.
-func NewClaudeApproximator() *ClaudeApproximator {
+// NewClaudeApproximator creates a character-based approximator tuned for
+// Claude models. Uses a 3.8 characters per token ratio.
+func NewClaudeApproximator() Tokenizer {
 	return &ClaudeApproximator{}
 }
 
 // CountTokens approximates token count for Claude.
 func (c *ClaudeApproximator) CountTokens(text string) (int, error) {
-	chars := len(text)
-	tokens := int(float64(chars) / 3.8)
+	tokens := int(float64(len(text)) / claudeCharsPerToken)
 	return tokens, nil
 }
 
@@ -133,17 +154,16 @@ func (c *ClaudeApproximator) IsExact() bool {
 }
 
 // SPMTokenizerWrapper uses a .model vocab file for exact tokenization.
-// Supports models like Llama 2, Mistral, and Gemma.
 type SPMTokenizerWrapper struct {
 	processor *sentencepiece.Processor
 	modelPath string
 }
 
-// NewSPMTokenizer creates a tokenizer from a SentencePiece .model file.
-// Returns an error if the model file doesn't exist, is inaccessible, or cannot be loaded.
-func NewSPMTokenizer(modelPath string) (*SPMTokenizerWrapper, error) {
+// NewSPMTokenizer creates a SentencePiece tokenizer from a .model vocab file.
+// Supports Llama, Mistral, Gemma, and other SPM-based models.
+func NewSPMTokenizer(modelPath string) (Tokenizer, error) {
 	if modelPath == "" {
-		return nil, fmt.Errorf("model path is required for SPMTokenizerWrapper")
+		return nil, ErrVocabFileRequired
 	}
 
 	if _, err := os.Stat(modelPath); err != nil {

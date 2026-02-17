@@ -1,13 +1,14 @@
+// Package fileops provides file system operations for token counting,
+// including directory traversal with .gitignore support and binary detection.
 package fileops
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	gitignore "github.com/sabhiram/go-gitignore"
-
-	"github.com/lancekrogers/go-token-counter/internal/errors"
 )
 
 // WalkResult contains information about walked files.
@@ -34,7 +35,7 @@ func WalkDirectory(ctx context.Context, rootPath string) (*WalkResult, error) {
 	if _, err := os.Stat(gitignoreFile); err == nil {
 		gi, err = gitignore.CompileIgnoreFile(gitignoreFile)
 		if err != nil {
-			return nil, errors.Parse("parsing .gitignore", err).WithField("path", gitignoreFile)
+			return nil, fmt.Errorf("parsing .gitignore %s: %w", gitignoreFile, err)
 		}
 	}
 
@@ -81,19 +82,27 @@ func WalkDirectory(ctx context.Context, rootPath string) (*WalkResult, error) {
 	})
 
 	if err != nil {
-		return nil, errors.IO("walking directory", err).WithField("path", rootPath)
+		return nil, fmt.Errorf("walking directory %s: %w", rootPath, err)
 	}
 
 	return result, nil
 }
 
 // AggregateFileContents reads all files and returns combined content.
+// Pre-allocates the result buffer based on file sizes to minimize allocations.
 func AggregateFileContents(ctx context.Context, files []string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	var totalContent []byte
+	totalSize := int64(0)
+	for _, file := range files {
+		if info, err := os.Stat(file); err == nil {
+			totalSize += info.Size()
+		}
+	}
+
+	totalContent := make([]byte, 0, totalSize)
 
 	for _, file := range files {
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -102,7 +111,7 @@ func AggregateFileContents(ctx context.Context, files []string) ([]byte, error) 
 
 		content, err := os.ReadFile(file)
 		if err != nil {
-			return nil, errors.IO("reading file", err).WithField("path", file)
+			return nil, fmt.Errorf("reading file %s: %w", file, err)
 		}
 		totalContent = append(totalContent, content...)
 	}

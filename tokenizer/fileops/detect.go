@@ -2,6 +2,8 @@ package fileops
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +13,7 @@ import (
 var binaryExtensions = map[string]bool{
 	// Images
 	".png": true, ".jpg": true, ".jpeg": true, ".gif": true,
-	".bmp": true, ".ico": true, ".svg": true, ".webp": true,
+	".bmp": true, ".ico": true, ".webp": true,
 	".tiff": true, ".tif": true,
 
 	// Documents
@@ -52,7 +54,7 @@ func IsBinaryFile(path string) (bool, error) {
 
 	buf := make([]byte, 512)
 	n, err := file.Read(buf)
-	if err != nil && err.Error() != "EOF" {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
 	}
 

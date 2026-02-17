@@ -196,7 +196,8 @@ func newBPETokenizer(encoder *Encoder, definition *Definition, specialTokensSet 
 }
 
 // Encode tokenizes text with optional special token handling.
-func (tok *BPETokenizer) Encode(text string, allowedSpecial []string, disallowedSpecial []string) []int {
+// Returns an error if text contains a disallowed special token.
+func (tok *BPETokenizer) Encode(text string, allowedSpecial []string, disallowedSpecial []string) ([]int, error) {
 	var allowedSpecialSet map[string]any
 	if len(allowedSpecial) == 0 {
 		allowedSpecialSet = map[string]any{}
@@ -221,12 +222,12 @@ func (tok *BPETokenizer) Encode(text string, allowedSpecial []string, disallowed
 		specialRegex := tok.specialTokenRegex(disallowedSpecialSet)
 		m := findMatch(text, specialRegex)
 		if m != "" {
-			panic(fmt.Sprintf("text contains disallowed special token %s", m))
+			return nil, fmt.Errorf("text contains disallowed special token %q", m)
 		}
 	}
 
 	tokens, _ := tok.encoder.encode(text, allowedSpecialSet)
-	return tokens
+	return tokens, nil
 }
 
 // EncodeOrdinary tokenizes text without special token handling.

@@ -2,6 +2,8 @@ package commands
 
 import (
 	"testing"
+
+	"github.com/lancekrogers/go-token-counter/tokenizer"
 )
 
 func TestIsValidModel(t *testing.T) {
@@ -23,15 +25,17 @@ func TestIsValidModel(t *testing.T) {
 		{"gpt-4", true},
 		{"gpt-4-turbo", true},
 		{"gpt-3.5-turbo", true},
-		{"claude-4-opus", true},
-		{"claude-4-sonnet", true},
-		{"claude-4.5-sonnet", true},
-		{"claude-3.7-sonnet", true},
-		{"claude-3.5-sonnet", true},
-		{"claude-3-opus", true},
-		{"claude-3-sonnet", true},
-		{"claude-3-haiku", true},
-		{"claude-3", true},
+		{"claude-opus-4.6", true},
+		{"claude-opus-4.5", true},
+		{"claude-opus-4.1", true},
+		{"claude-opus-4", true},
+		{"claude-sonnet-4.6", true},
+		{"claude-sonnet-4.5", true},
+		{"claude-sonnet-4", true},
+		{"claude-haiku-4.5", true},
+		{"claude-haiku-3.5", true},
+		{"claude-haiku-3", true},
+		{"claude-opus-3", true},
 		{"llama-3.1-8b", true},
 		{"llama-4-scout", true},
 		{"llama-4-maverick", true},
@@ -94,7 +98,7 @@ func TestRequiresSentencePiece(t *testing.T) {
 		{"llama-4-scout", true, true},
 		{"llama-4-maverick", true, true},
 		{"gpt-5", false, false},
-		{"claude-4-opus", false, false},
+		{"claude-opus-4.6", false, false},
 		{"deepseek-v3", false, false},
 	}
 
@@ -114,14 +118,14 @@ func TestRequiresSentencePiece(t *testing.T) {
 	}
 }
 
-func TestValidModels(t *testing.T) {
-	models := validModels()
+func TestListModelsContainsKeyModels(t *testing.T) {
+	models := tokenizer.ListModels()
 	if len(models) == 0 {
-		t.Fatal("validModels() returned empty list")
+		t.Fatal("tokenizer.ListModels() returned empty list")
 	}
 
 	// Check key models are present
-	required := []string{"gpt-5", "gpt-4o", "claude-4-opus", "claude-4-sonnet", "llama-4-scout", "deepseek-v3", "qwen-3-72b"}
+	required := []string{"gpt-5", "gpt-4o", "claude-opus-4.6", "claude-sonnet-4.6", "llama-4-scout", "deepseek-v3", "qwen-3-72b"}
 	for _, model := range required {
 		found := false
 		for _, m := range models {
@@ -131,7 +135,7 @@ func TestValidModels(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("Required model %q not in validModels()", model)
+			t.Errorf("Required model %q not in tokenizer.ListModels()", model)
 		}
 	}
 }
