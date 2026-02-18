@@ -37,6 +37,7 @@ var binaryExtensions = map[string]bool{
 
 	// Other
 	".pyc": true, ".class": true, ".o": true, ".a": true,
+	".tiktoken": true,
 }
 
 // IsBinaryFile checks if a file is likely binary.
